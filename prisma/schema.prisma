@@ -1,0 +1,156 @@
+// prisma/schema.prisma - VERSIÓN CORREGIDA
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(USER)
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations - AGREGAR ESTAS RELACIONES FALTANTES
+  casosAsignados Caso[]
+  actividades    Actividad[]
+  documentos     Documento[] // 👈 RELACIÓN FALTANTE
+
+  @@map("users")
+}
+
+model Entidad {
+  id          String  @id @default(cuid())
+  nombre      String  @unique
+  sigla       String
+  email       String?
+  descripcion String?
+  color       String
+
+  casos Caso[]
+
+  @@map("entidades")
+}
+
+model Caso {
+  id          String     @id @default(cuid())
+  asunto      String
+  descripcion String?
+  prioridad   Prioridad  @default(MEDIA)
+  estado      EstadoCaso @default(PENDIENTE)
+
+  // Relación con email original
+  emailId String? @unique
+  email   Email?  @relation(fields: [emailId], references: [id])
+
+  entidadId String
+  entidad   Entidad @relation(fields: [entidadId], references: [id])
+
+  responsableId String?
+  responsable   User?   @relation(fields: [responsableId], references: [id])
+
+  fechaRecepcion   DateTime  @default(now())
+  fechaVencimiento DateTime?
+  fechaCierre      DateTime?
+
+  // Relations
+  actividades Actividad[]
+  documentos  Documento[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("casos")
+}
+
+model Email {
+  id        String   @id @default(cuid())
+  messageId String   @unique
+  from      String
+  to        String
+  subject   String
+  body      String
+  html      String?
+  fecha     DateTime
+
+  // Adjuntos
+  attachments Json?
+
+  // Procesamiento
+  entidadDetectada   String?
+  prioridadDetectada Prioridad?
+  procesado          Boolean    @default(false)
+
+  caso Caso?
+
+  createdAt DateTime @default(now())
+
+  @@map("emails")
+}
+
+model Actividad {
+  id          String        @id @default(cuid())
+  tipo        TipoActividad
+  descripcion String
+  fecha       DateTime      @default(now())
+
+  casoId String
+  caso   Caso   @relation(fields: [casoId], references: [id])
+
+  usuarioId String
+  usuario   User   @relation(fields: [usuarioId], references: [id])
+
+  @@map("actividades")
+}
+
+model Documento {
+  id      String @id @default(cuid())
+  nombre  String
+  tipo    String
+  url     String
+  tamaño Int
+
+  casoId String?
+  caso   Caso?   @relation(fields: [casoId], references: [id])
+
+  usuarioId String
+  usuario   User   @relation(fields: [usuarioId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("documentos")
+}
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  USER
+}
+
+enum Prioridad {
+  ALTA
+  MEDIA
+  BAJA
+}
+
+enum EstadoCaso {
+  PENDIENTE
+  ASIGNADO
+  EN_PROGRESO
+  RESPONDIDO
+  CERRADO
+}
+
+enum TipoActividad {
+  CREACION
+  ASIGNACION
+  CAMBIO_ESTADO
+  COMENTARIO
+  VENCIMIENTO
+}
