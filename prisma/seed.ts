@@ -1,96 +1,53 @@
 // prisma/seed.ts
-// Script para poblar la base de datos con datos de prueba
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Iniciando seed de la base de datos...');
+  console.log('🌱 Ejecutando seed...');
+  
+  try {
+    // Crear un usuario simple
+    const user = await prisma.user.create({
+      data: {
+        email: 'admin@llanogas.com',
+        name: 'Administrador',
+        password: 'password123',
+        role: 'ADMIN',
+      },
+    });
+    console.log('✅ Usuario creado');
 
-  // Crear usuarios de prueba
-  const hashedPassword = await bcrypt.hash('123456', 12);
-
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@llanogas.com' },
-    update: {},
-    create: {
-      email: 'admin@llanogas.com',
-      name: 'Administrador Sistema',
-      password: hashedPassword,
-      role: 'ADMIN',
-    },
-  });
-
-  const user1 = await prisma.user.upsert({
-    where: { email: 'ana.garcia@llanogas.com' },
-    update: {},
-    create: {
-      email: 'ana.garcia@llanogas.com',
-      name: 'Ana García',
-      password: hashedPassword,
-      role: 'USER',
-    },
-  });
-
-  const user2 = await prisma.user.upsert({
-    where: { email: 'carlos.rodriguez@llanogas.com' },
-    update: {},
-    create: {
-      email: 'carlos.rodriguez@llanogas.com',
-      name: 'Carlos Rodríguez',
-      password: hashedPassword,
-      role: 'USER',
-    },
-  });
-
-  // Crear entidades
-  const entidades = await Promise.all([
-    prisma.entidad.upsert({
-      where: { sigla: 'SUI' },
-      update: {},
-      create: {
-        nombre: 'Superintendencia de Servicios Públicos',
+    // Crear una entidad simple
+    const entidad = await prisma.entidad.create({
+      data: {
+        nombre: 'SUI',
         sigla: 'SUI',
         color: '#3B82F6',
-        email: 'sui@superservicios.gov.co',
-        descripcion: 'Entidad encargada de la supervisión de servicios públicos'
+        email: 'sui@gov.co',
       },
-    }),
-    prisma.entidad.upsert({
-      where: { sigla: 'SS' },
-      update: {},
-      create: {
-        nombre: 'Superservicios',
-        sigla: 'SS',
-        color: '#10B981',
-        email: 'contacto@superservicios.gov.co',
-        descripcion: 'Superintendencia de Servicios Públicos Domiciliarios'
-      },
-    }),
-    prisma.entidad.upsert({
-      where: { sigla: 'MME' },
-      update: {},
-      create: {
-        nombre: 'Ministerio de Minas y Energía',
-        sigla: 'MME',
-        color: '#8B5CF6',
-        email: 'minminas@minminas.gov.co',
-        descripcion: 'Ministerio encargado del sector minero energético'
-      },
-    }),
-  ]);
+    });
+    console.log('✅ Entidad creada');
 
-  console.log('✅ Seed completado!');
-  console.log('👤 Usuarios creados:', admin.email, user1.email, user2.email);
-  console.log('🏢 Entidades creadas:', entidades.length);
+    // Crear un caso simple
+    const caso = await prisma.caso.create({
+      data: {
+        asunto: 'Primer caso de prueba',
+        descripcion: 'Este es el primer caso en el sistema',
+        prioridad: 'ALTA',
+        estado: 'PENDIENTE',
+        entidadId: entidad.id,
+        responsableId: user.id,
+      },
+    });
+    console.log('✅ Caso creado');
+
+    console.log('🎉 Seed completado!');
+    
+  } catch (error) {
+    console.error('❌ Error:', error);
+  }
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Error en seed:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());

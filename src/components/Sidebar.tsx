@@ -45,8 +45,20 @@ export default function Sidebar({ user }: SidebarProps) {
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">LG</span>
+          <div className="flex items-center space-x-2">
+            <img 
+                    src="/images/llanogas_logo.png" 
+                    alt="Logo de Llanogas" 
+                    className="w-80 h-22"
+                    onError={(e) => { 
+                        e.currentTarget.onerror = null; 
+                        e.currentTarget.style.display = 'none';
+                        const span = document.createElement('span');
+                        span.textContent = 'LG';
+                        span.className = 'text-blue-800 text-sm font-extrabold';
+                        e.currentTarget.parentElement?.appendChild(span);
+                    }} 
+                />
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900">LLANOGAS</h1>
