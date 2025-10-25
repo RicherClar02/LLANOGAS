@@ -5,35 +5,62 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url = "postgresql://postgres:RiDDSXfJYeQXXsQoOeOpLNhDfVzYUMwN@interchange.proxy.rlwy.net:39811/railway"
+  url      = "postgresql://postgres:Richer02@localhost:5432/llanogas?schema=public"
 }
 
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String
-  role      UserRole @default(USER)
+  role      UserRole @default(GESTOR)
   password  String
+  activo    Boolean  @default(true)
+  
+  // Información adicional para auditoría
+  cargo       String?
+  proceso     String?
+  idColaborador String?
+  
+  // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  fechaInactivacion DateTime?
 
-  // Relations - AGREGAR ESTAS RELACIONES FALTANTES
-  casosAsignados Caso[]
-  actividades    Actividad[]
-  documentos     Documento[] // 👈 RELACIÓN FALTANTE
+  // Relations - CORREGIDAS
+  casosAsignados   Caso[]      @relation("CasosAsignados")
+  actividades      Actividad[]
+  documentos       Documento[]
+  casosCreados     Caso[]      @relation("CasosCreados")
+  revisiones       Revision[]
+  aprobaciones     Aprobacion[]
+  entidadesResponsable Entidad[] @relation("ResponsableEntidad")
 
   @@map("users")
 }
 
 model Entidad {
-  id          String  @id @default(cuid())
-  nombre      String  @unique
+  id          String   @id @default(cuid())
+  nombre      String   @unique
   sigla       String
   email       String?
   descripcion String?
   color       String
+  activo      Boolean  @default(true)
+
+  // Campos para clasificación automática
+  dominiosCorreo String[]
+  palabrasClave  String[]
+  tiempoRespuestaDias Int
+
+  // Responsable por defecto - CORREGIDA
+  responsablePorDefectoId String?
+  responsablePorDefecto   User?   @relation("ResponsableEntidad", fields: [responsablePorDefectoId], references: [id])
 
   casos Caso[]
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("entidades")
 }
@@ -44,25 +71,51 @@ model Caso {
   descripcion String?
   prioridad   Prioridad  @default(MEDIA)
   estado      EstadoCaso @default(PENDIENTE)
+  
+  // Workflow de aprobación
+  etapaAprobacion EtapaAprobacion @default(RECIBIDO)
+  tipoSolicitud   TipoSolicitud
+
+  // Información de radicados
+  numeroRadicadoEntrada String?
+  numeroRadicadoSalida  String?
+  idGLPI               String?
 
   // Relación con email original
   emailId String? @unique
   email   Email?  @relation(fields: [emailId], references: [id])
 
+  // Entidad y responsables - CORREGIDAS
   entidadId String
   entidad   Entidad @relation(fields: [entidadId], references: [id])
 
   responsableId String?
-  responsable   User?   @relation(fields: [responsableId], references: [id])
+  responsable   User?   @relation("CasosAsignados", fields: [responsableId], references: [id], onDelete: SetNull)
 
+  creadorId String
+  creador   User    @relation("CasosCreados", fields: [creadorId], references: [id])
+
+  // Fechas del workflow
   fechaRecepcion   DateTime  @default(now())
   fechaVencimiento DateTime?
+  fechaInicioRedaccion DateTime?
+  fechaEnvioRevision DateTime?
+  fechaRevision    DateTime?
+  fechaEnvioAprobacion DateTime?
+  fechaAprobacion  DateTime?
+  fechaEnvioFirma  DateTime?
+  fechaFirmaLegal  DateTime?
+  fechaEnvioFinal  DateTime?
+  fechaAcuseRecibo DateTime?
   fechaCierre      DateTime?
 
   // Relations
-  actividades Actividad[]
-  documentos  Documento[]
+  actividades  Actividad[]
+  documentos   Documento[]
+  revisiones   Revision[]
+  aprobaciones Aprobacion[]
 
+  // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -86,6 +139,7 @@ model Email {
   entidadDetectada   String?
   prioridadDetectada Prioridad?
   procesado          Boolean    @default(false)
+  clasificado        Boolean    @default(false)
 
   caso Caso?
 
@@ -98,23 +152,29 @@ model Actividad {
   id          String        @id @default(cuid())
   tipo        TipoActividad
   descripcion String
-  fecha       DateTime      @default(now())
+  metadata    Json?
 
-  casoId String
-  caso   Caso   @relation(fields: [casoId], references: [id])
+  casoId    String
+  caso      Caso   @relation(fields: [casoId], references: [id])
 
   usuarioId String
   usuario   User   @relation(fields: [usuarioId], references: [id])
+
+  fecha     DateTime @default(now())
 
   @@map("actividades")
 }
 
 model Documento {
-  id      String @id @default(cuid())
-  nombre  String
-  tipo    String
-  url     String
-  tamano Int
+  id        String   @id @default(cuid())
+  nombre    String
+  tipo      String
+  url       String
+  tamano    Int
+  version   Int      @default(1)
+  
+  driveId   String?
+  esPlantilla Boolean @default(false)
 
   casoId String?
   caso   Caso?   @relation(fields: [casoId], references: [id])
@@ -123,17 +183,58 @@ model Documento {
   usuario   User   @relation(fields: [usuarioId], references: [id])
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("documentos")
 }
 
+model Revision {
+  id        String   @id @default(cuid())
+  estado    EstadoRevision @default(PENDIENTE)
+  comentario String?
+  
+  casoId    String
+  caso      Caso    @relation(fields: [casoId], references: [id])
+  
+  revisorId String
+  revisor   User    @relation(fields: [revisorId], references: [id])
+  
+  fechaAsignacion DateTime @default(now())
+  fechaRevision   DateTime?
+  
+  @@map("revisiones")
+}
+
+model Aprobacion {
+  id        String   @id @default(cuid())
+  estado    EstadoAprobacion @default(PENDIENTE)
+  comentario String?
+  
+  casoId      String
+  caso        Caso    @relation(fields: [casoId], references: [id])
+  
+  aprobadorId String
+  aprobador   User    @relation(fields: [aprobadorId], references: [id])
+  
+  fechaAsignacion DateTime @default(now())
+  fechaAprobacion DateTime?
+  
+  @@map("aprobaciones")
+}
+
+// ENUMS
 enum UserRole {
-  ADMIN
-  SUPERVISOR
-  USER
+  ADMINISTRADOR_SISTEMA
+  ADMINISTRADOR_ASIGNACIONES
+  GESTOR
+  REVISOR_JURIDICO
+  APROBADOR
+  ROL_SEGUIMIENTO
+  AUDITOR
 }
 
 enum Prioridad {
+  MUY_ALTA
   ALTA
   MEDIA
   BAJA
@@ -142,9 +243,37 @@ enum Prioridad {
 enum EstadoCaso {
   PENDIENTE
   ASIGNADO
-  EN_PROGRESO
-  RESPONDIDO
+  EN_REDACCIÓN
+  EN_REVISION
+  EN_APROBACION
+  FIRMA_LEGAL
+  LISTO_ENVIO
+  ENVIADO
+  CON_ACUSE
   CERRADO
+}
+
+enum EtapaAprobacion {
+  RECIBIDO
+  ASIGNADO
+  EN_REDACCIÓN
+  EN_REVISION
+  EN_APROBACION
+  FIRMA_LEGAL
+  LISTO_ENVIO
+  ENVIADO
+  CON_ACUSE
+}
+
+enum TipoSolicitud {
+  SOLICITUD_INFORMACION
+  AUDITORIA
+  RESPUESTA_COMUNICADO
+  REQUERIMIENTO_JUDICIAL
+  SOLICITUD_VIABILIDAD
+  CONSULTA_JURIDICA
+  REPORTE_OBLIGATORIO
+  OTRO
 }
 
 enum TipoActividad {
@@ -153,4 +282,26 @@ enum TipoActividad {
   CAMBIO_ESTADO
   COMENTARIO
   VENCIMIENTO
+  INICIO_REDACCIÓN
+  ENVIO_REVISION
+  ENVIO_APROBACION
+  APROBACION
+  RECHAZO
+  FIRMA_LEGAL
+  ENVIO_FINAL
+  ACUSE_RECIBO
+}
+
+enum EstadoRevision {
+  PENDIENTE
+  REVISADO
+  CORREGIR
+  RECHAZADO
+}
+
+enum EstadoAprobacion {
+  PENDIENTE
+  APROBADO
+  CORREGIR
+  RECHAZADO
 }

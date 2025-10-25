@@ -1,16 +1,11 @@
 // src/components/AuthProvider.tsx
-// Provider para manejar la sesión de NextAuth
 'use client';
 import { SessionProvider } from 'next-auth/react';
 
-export default function AuthProvider({
-  children,
-}: {
+interface AuthProviderProps {
   children: React.ReactNode;
-}) {
-  return (
-    <SessionProvider>
-      {children}
-    </SessionProvider>
-  );
+}
+
+export default function AuthProvider({ children }: AuthProviderProps) {
+  return <SessionProvider>{children}</SessionProvider>;
 }

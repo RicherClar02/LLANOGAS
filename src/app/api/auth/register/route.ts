@@ -1,66 +1,79 @@
-// src/app/api/auth/register/route.ts - VERSIÓN CORREGIDA
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import 'next-auth';
+import { DefaultSession } from 'next-auth';
 
-const prisma = new PrismaClient();
+// ---------------------------------------------------------------------
+// 1. Extender la Interfaz de Sesión (usada en useSession, getSession)
+// ---------------------------------------------------------------------
 
-export async function POST(request: Request) {
-  try {
-    const { name, email, password } = await request.json();
+declare module 'next-auth' {
+  /**
+   * Extiende la interfaz Session para incluir propiedades personalizadas
+   * que vienen del JWT y son añadidas en el callback 'session'.
+   */
+  interface Session {
+    user: {
+      id: string; // ID del usuario de la base de datos (añadido en el JWT)
+      name: string;
+      email: string;
+      // Define el tipo exacto que usa tu enum de Prisma (UserRole)
+      role: 
+        | 'ADMINISTRADOR_SISTEMA' 
+        | 'ADMINISTRADOR_ASIGNACIONES' 
+        | 'GESTOR' 
+        | 'REVISOR_JURIDICO' 
+        | 'APROBADOR' 
+        | 'ROL_SEGUIMIENTO' 
+        | 'AUDITOR'; 
+      // Las hacemos opcionales (?) para ser consistentes con el schema.prisma
+      cargo?: string | null; // Acepta null ya que viene de DB (String?)
+      proceso?: string | null; // Acepta null ya que viene de DB (String?)
+    } & DefaultSession['user'];
+  }
 
-    console.log('Intentando registrar usuario:', { name, email });
+  /**
+   * Extiende la interfaz User para la función signIn
+   * (Datos que vienen directamente de la base de datos)
+   */
+  interface User {
+    role: 
+        | 'ADMINISTRADOR_SISTEMA' 
+        | 'ADMINISTRADOR_ASIGNACIONES' 
+        | 'GESTOR' 
+        | 'REVISOR_JURIDICO' 
+        | 'APROBADOR' 
+        | 'ROL_SEGUIMIENTO' 
+        | 'AUDITOR';
+    // Las hacemos opcionales (?)
+    cargo?: string | null;
+    proceso?: string | null;
+  }
+}
 
-    // Validar datos requeridos
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { error: 'Todos los campos son requeridos' },
-        { status: 400 }
-      );
-    }
+// ---------------------------------------------------------------------
+// 2. Extender la Interfaz JWT (usada en el callback 'jwt')
+// ---------------------------------------------------------------------
 
-    // Verificar si el usuario ya existe
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    });
+import 'next-auth/jwt';
 
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'El usuario ya existe' },
-        { status: 400 }
-      );
-    }
-
-    // Hashear la contraseña
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Crear nuevo usuario
-    const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: 'USER',
-      },
-    });
-
-    console.log('Usuario creado exitosamente:', user.email);
-
-    // Retornar usuario sin password
-    const { password: _, ...userWithoutPassword } = user;
-
-    return NextResponse.json(
-      { 
-        user: userWithoutPassword, 
-        message: 'Usuario creado exitosamente' 
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error('Error en registro:', error);
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    );
+declare module 'next-auth/jwt' {
+  /**
+   * Extiende la interfaz JWT para incluir las propiedades personalizadas
+   * que se guardan en el token cifrado.
+   */
+  interface JWT {
+    id: string; // Necesario para el tipado consistente
+    name?: string | null;
+    email?: string | null;
+    role: 
+        | 'ADMINISTRADOR_SISTEMA' 
+        | 'ADMINISTRADOR_ASIGNACIONES' 
+        | 'GESTOR' 
+        | 'REVISOR_JURIDICO' 
+        | 'APROBADOR' 
+        | 'ROL_SEGUIMIENTO' 
+        | 'AUDITOR';
+    // Las hacemos opcionales (?) y aceptando null
+    cargo?: string | null;
+    proceso?: string | null;
   }
 }
