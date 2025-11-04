@@ -24,10 +24,10 @@ interface User {
   name: string;
   email: string;
   role: string;
- 
   cargo?: string; 
   proceso?: string;
 }
+
 
 interface SidebarProps {
   user: User;
@@ -76,9 +76,9 @@ export default function Sidebar({ user }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
-  // Filtrar items según el rol del usuario
+  // CORRECCIÓN: Verificar que user y user.role existan antes de usarlos
   const filteredNavigation = navigationItems.filter(item => 
-    item.roles.includes(user.role)
+    user?.role && item.roles.includes(user.role)
   );
 
   const isActive = (href: string) => {
@@ -88,6 +88,11 @@ export default function Sidebar({ user }: SidebarProps) {
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/login' });
   };
+
+  // CORRECCIÓN: Si no hay usuario o no tiene rol, no renderizar el sidebar
+  if (!user?.role) {
+    return null;
+  }
 
   return (
     <>
@@ -118,7 +123,6 @@ export default function Sidebar({ user }: SidebarProps) {
         {/* Logo */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
-            {/* Usamos un placeholder simple para el logo */}
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-extrabold text-sm">LG</span>
             </div>
@@ -165,17 +169,17 @@ export default function Sidebar({ user }: SidebarProps) {
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
               <span className="text-blue-600 font-semibold text-sm">
-                {/* Genera iniciales */}
-                {user.name.split(' ').map(n => n[0]).join('')}
+                {/* CORRECCIÓN: Verificar que user.name exista */}
+                {user?.name ? user.name.split(' ').map(n => n[0]).join('') : 'U'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate" title={user.name}>
                 {user.name}
               </p>
-              {/* Mostrando rol */}
+              {/* CORRECCIÓN: Verificar que user.role exista */}
               <p className="text-xs text-blue-600 capitalize">
-                {user.role.replace(/_/g, ' ').toLowerCase()}
+                {user?.role ? user.role.replace(/_/g, ' ').toLowerCase() : 'usuario'}
               </p>
               {/* Opcional: Mostrar cargo si existe */}
               {user.cargo && (

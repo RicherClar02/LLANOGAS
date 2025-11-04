@@ -1,102 +1,218 @@
-// src/app/dashboard/bandeja/[id]/page.tsx
-// Página de detalle de un caso específico
+// src/app/dashboard/bandeja/[id]/page.tsx - VERSIÓN COMPLETA Y FUNCIONAL
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
-  User, 
-  Calendar, 
-  Mail,
+  Save, 
+  Send, 
+  CheckCircle, 
   Clock,
-  CheckCircle,
-  Edit,
-  Paperclip,
+  FileText,
+  Users,
+  Calendar,
+  AlertTriangle,
   MessageSquare
 } from 'lucide-react';
 
-// Datos de ejemplo para el caso
-const mockCasoDetalle = {
-  id: '1',
-  asunto: 'Reporte mensual de consumo - Enero 2024',
-  descripcion: 'Solicitud de reporte mensual de consumo de gas natural para el mes de enero 2024. Se requiere información detallada de consumo por cliente, sector y tipo de servicio.',
-  prioridad: 'ALTA',
-  estado: 'PENDIENTE',
-  entidad: { 
-    nombre: 'Superintendencia de Servicios Públicos', 
-    sigla: 'SUI', 
-    color: '#3B82F6',
-    email: 'sui@superservicios.gov.co'
-  },
-  responsable: { 
-    id: '2', 
-    name: 'Ana García',
-    email: 'ana.garcia@llanogas.com'
-  },
-  fechaRecepcion: '2024-01-15T10:30:00Z',
-  fechaVencimiento: '2024-01-25T23:59:00Z',
-  actividades: [
-    {
-      id: '1',
-      tipo: 'CREACION',
-      descripcion: 'Caso creado automáticamente desde correo electrónico',
-      fecha: '2024-01-15T10:30:00Z',
-      usuario: { name: 'Sistema' }
-    },
-    {
-      id: '2',
-      tipo: 'ASIGNACION',
-      descripcion: 'Caso asignado a Ana García',
-      fecha: '2024-01-15T11:15:00Z',
-      usuario: { name: 'Admin Sistema' }
-    }
-  ],
-  documentos: [
-    {
-      id: '1',
-      nombre: 'solicitud-reporte-enero.pdf',
-      tipo: 'application/pdf',
-      tamaño: 245760,
-      fecha: '2024-01-15T10:30:00Z'
-    }
-  ]
-};
+interface Caso {
+  id: string;
+  asunto: string;
+  descripcion: string;
+  prioridad: 'MUY_ALTA' | 'ALTA' | 'MEDIA' | 'BAJA';
+  estado: string;
+  etapaAprobacion: string;
+  tipoSolicitud: string;
+  fechaRecepcion: string;
+  fechaVencimiento: string;
+  entidad: {
+    nombre: string;
+    sigla: string;
+    color: string;
+    tiempoRespuestaDias: number;
+  };
+  responsable: {
+    name: string;
+    email: string;
+    cargo?: string;
+  };
+  actividades: Array<{
+    id: string;
+    tipo: string;
+    descripcion: string;
+    fecha: string;
+    usuario: {
+      name: string;
+      email: string;
+    };
+  }>;
+}
 
-export default function CasoDetallePage() {
+export default function DetalleCasoPage() {
+  const { data: session } = useSession();
   const params = useParams();
   const router = useRouter();
-  const [caso, setCaso] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const casoId = params.id as string;
 
+  const [caso, setCaso] = useState<Caso | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editando, setEditando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [formData, setFormData] = useState({
+    descripcion: '',
+    prioridad: 'MEDIA' as 'MUY_ALTA' | 'ALTA' | 'MEDIA' | 'BAJA',
+  });
+  const [nuevoComentario, setNuevoComentario] = useState('');
+
+  // Cargar datos del caso
   useEffect(() => {
-    // Simular carga de datos
-    setTimeout(() => {
-      setCaso(mockCasoDetalle);
-      setLoading(false);
-    }, 1000);
-  }, [params.id]);
+    const cargarCaso = async () => {
+      try {
+        const response = await fetch(`/api/casos/${casoId}`);
+        
+        if (!response.ok) {
+          throw new Error('Error cargando caso');
+        }
+        
+        const data = await response.json();
+        setCaso(data);
+        setFormData({
+          descripcion: data.descripcion || '',
+          prioridad: data.prioridad
+        });
+      } catch (error) {
+        console.error('Error cargando caso:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarCaso();
+  }, [casoId]);
+
+  const handleGuardar = async () => {
+    if (!caso) return;
+    
+    setGuardando(true);
+    try {
+      const response = await fetch(`/api/casos/${casoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error guardando caso');
+      }
+
+      const casoActualizado = await response.json();
+      setCaso(casoActualizado);
+      setEditando(false);
+      
+      // Agregar actividad de edición
+      await fetch('/api/actividades', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tipo: 'COMENTARIO',
+          descripcion: 'Caso actualizado',
+          casoId: casoId,
+          usuarioId: session?.user?.id,
+        }),
+      });
+      
+    } catch (error) {
+      console.error('Error guardando caso:', error);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const handleEnviarRevision = async () => {
+    if (!caso) return;
+    
+    try {
+      const response = await fetch(`/api/casos/${casoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          etapaAprobacion: 'EN_REVISION',
+          estado: 'EN_REVISION'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error enviando a revisión');
+      }
+
+      const casoActualizado = await response.json();
+      setCaso(casoActualizado);
+      
+      // Agregar actividad de envío a revisión
+      await fetch('/api/actividades', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tipo: 'ENVIO_REVISION',
+          descripcion: 'Caso enviado a revisión',
+          casoId: casoId,
+          usuarioId: session?.user?.id,
+        }),
+      });
+      
+      router.push('/dashboard/bandeja?message=Enviado a revisión exitosamente');
+      
+    } catch (error) {
+      console.error('Error enviando a revisión:', error);
+    }
+  };
+
+  const handleAgregarComentario = async () => {
+    if (!nuevoComentario.trim() || !session?.user) return;
+
+    try {
+      const response = await fetch('/api/actividades', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tipo: 'COMENTARIO',
+          descripcion: nuevoComentario,
+          casoId: casoId,
+          usuarioId: session.user.id,
+        }),
+      });
+
+      if (response.ok) {
+        setNuevoComentario('');
+        // Recargar el caso para mostrar el nuevo comentario
+        const responseCaso = await fetch(`/api/casos/${casoId}`);
+        if (responseCaso.ok) {
+          setCaso(await responseCaso.json());
+        }
+      }
+    } catch (error) {
+      console.error('Error agregando comentario:', error);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => router.back()}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div className="flex-1">
-            <div className="h-6 bg-gray-200 rounded w-1/3 mb-2 animate-pulse"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/4 animate-pulse"></div>
-          </div>
-        </div>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Cargando caso...</p>
-          </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando caso...</p>
         </div>
       </div>
     );
@@ -104,220 +220,277 @@ export default function CasoDetallePage() {
 
   if (!caso) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => router.back()}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Caso no encontrado</h1>
-          </div>
-        </div>
-        <div className="text-center py-12">
-          <p className="text-gray-600">El caso solicitado no existe o no tienes acceso.</p>
-        </div>
+      <div className="text-center py-12">
+        <AlertTriangle className="mx-auto text-gray-400 mb-4" size={48} />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Caso no encontrado</h3>
+        <button 
+          onClick={() => router.push('/dashboard/bandeja')}
+          className="text-blue-600 hover:text-blue-700"
+        >
+          Volver a la bandeja
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header con navegación */}
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
-            onClick={() => router.back()}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+            onClick={() => router.push('/dashboard/bandeja')}
+            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{caso.asunto}</h1>
-            <p className="text-gray-600">Detalles del caso #{caso.id}</p>
+            <h1 className="text-2xl font-bold text-gray-900">Detalle del Caso</h1>
+            <p className="text-gray-600">ID: {caso.id}</p>
           </div>
         </div>
-        
+
         <div className="flex space-x-3">
-          <button className="flex items-center space-x-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
-            <Edit size={16} />
-            <span>Editar</span>
-          </button>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-            Cambiar Estado
-          </button>
+          {editando ? (
+            <>
+              <button
+                onClick={() => setEditando(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleGuardar}
+                disabled={guardando}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Save size={16} />
+                <span>{guardando ? 'Guardando...' : 'Guardar'}</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setEditando(true)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Editar
+              </button>
+              <button
+                onClick={handleEnviarRevision}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                <Send size={16} />
+                <span>Enviar a Revisión</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Columna principal - Información del caso */}
+        {/* Información Principal */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Tarjeta de información básica */}
+          {/* Tarjeta de Información Básica */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Información del Caso</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Entidad</label>
-                <div className="flex items-center space-x-2 mt-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Asunto</label>
+                <p className="text-gray-900 font-medium">{caso.asunto}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Entidad</label>
+                <div className="flex items-center space-x-2">
                   <div 
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: caso.entidad.color }}
                   ></div>
-                  <p className="text-gray-900">{caso.entidad.nombre} ({caso.entidad.sigla})</p>
+                  <span className="text-gray-900">{caso.entidad.nombre} ({caso.entidad.sigla})</span>
                 </div>
               </div>
-              
+
               <div>
-                <label className="text-sm font-medium text-gray-700">Prioridad</label>
-                <p className={`inline-flex px-3 py-1 rounded-full text-sm font-medium mt-1 ${
-                  caso.prioridad === 'ALTA' ? 'bg-red-100 text-red-800' :
-                  caso.prioridad === 'MEDIA' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-green-100 text-green-800'
-                }`}>
-                  {caso.prioridad}
-                </p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                {editando ? (
+                  <select
+                    value={formData.prioridad}
+                    onChange={(e) => setFormData({...formData, prioridad: e.target.value as any})}
+                    className="border border-gray-300 rounded-lg px-3 py-1 text-sm"
+                  >
+                    <option value="MUY_ALTA">Muy Alta</option>
+                    <option value="ALTA">Alta</option>
+                    <option value="MEDIA">Media</option>
+                    <option value="BAJA">Baja</option>
+                  </select>
+                ) : (
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    caso.prioridad === 'MUY_ALTA' ? 'bg-red-100 text-red-800' :
+                    caso.prioridad === 'ALTA' ? 'bg-orange-100 text-orange-800' :
+                    caso.prioridad === 'MEDIA' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {caso.prioridad.replace('_', ' ')}
+                  </span>
+                )}
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700">Estado</label>
-                <p className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium mt-1 ${
-                  caso.estado === 'PENDIENTE' ? 'bg-gray-100 text-gray-800' :
-                  caso.estado === 'ASIGNADO' ? 'bg-blue-100 text-blue-800' :
-                  caso.estado === 'EN_PROGRESO' ? 'bg-yellow-100 text-yellow-800' :
-                  caso.estado === 'RESPONDIDO' ? 'bg-green-100 text-green-800' :
-                  'bg-purple-100 text-purple-800'
-                }`}>
-                  {caso.estado === 'PENDIENTE' && <Clock size={14} />}
-                  {caso.estado === 'ASIGNADO' && <User size={14} />}
-                  {caso.estado === 'EN_PROGRESO' && <Clock size={14} />}
-                  {caso.estado === 'RESPONDIDO' && <CheckCircle size={14} />}
-                  <span>{caso.estado.replace('_', ' ')}</span>
-                </p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Solicitud</label>
+                <p className="text-gray-900">{caso.tipoSolicitud.replace(/_/g, ' ')}</p>
               </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Responsable</label>
-                <div className="flex items-center space-x-2 mt-1">
-                  <User size={16} className="text-gray-400" />
-                  <p className="text-gray-900">{caso.responsable?.name || 'Sin asignar'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Descripción */}
-            <div className="mt-6">
-              <label className="text-sm font-medium text-gray-700">Descripción</label>
-              <p className="text-gray-600 mt-1 leading-relaxed">{caso.descripcion}</p>
             </div>
           </div>
 
-          {/* Historial de actividades */}
+          {/* Descripción */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Historial de Actividades</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Descripción</h2>
+            {editando ? (
+              <textarea
+                value={formData.descripcion}
+                onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
+                rows={6}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Describe el caso..."
+              />
+            ) : (
+              <p className="text-gray-700 whitespace-pre-wrap">{caso.descripcion}</p>
+            )}
+          </div>
+
+          {/* Actividades y Comentarios */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Actividades y Comentarios</h2>
             
+            {/* Formulario para nuevo comentario */}
+            <div className="mb-6">
+              <textarea
+                value={nuevoComentario}
+                onChange={(e) => setNuevoComentario(e.target.value)}
+                placeholder="Agregar un comentario..."
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className="flex justify-end mt-2">
+                <button
+                  onClick={handleAgregarComentario}
+                  disabled={!nuevoComentario.trim()}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <MessageSquare size={16} />
+                  <span>Agregar Comentario</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de actividades */}
             <div className="space-y-4">
-              {caso.actividades.map((actividad: any) => (
-                <div key={actividad.id} className="flex space-x-4">
-                  <div className="flex flex-col items-center">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                    <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
-                  </div>
-                  <div className="flex-1 pb-4">
-                    <p className="text-gray-900">{actividad.descripcion}</p>
-                    <div className="flex items-center space-x-2 mt-1 text-sm text-gray-500">
-                      <span>{actividad.usuario.name}</span>
-                      <span>•</span>
-                      <span>{new Date(actividad.fecha).toLocaleString('es-ES')}</span>
+              {caso?.actividades?.map((actividad) => (
+                <div key={actividad.id} className="flex space-x-3 border-l-4 border-blue-500 pl-4 py-2">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <MessageSquare className="text-blue-600" size={16} />
                     </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-gray-900">{actividad.usuario.name}</span>
+                      <span className="text-sm text-gray-500">
+                        {new Date(actividad.fecha).toLocaleString('es-ES')}
+                      </span>
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                        {actividad.tipo.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <p className="text-gray-700 mt-1">{actividad.descripcion}</p>
                   </div>
                 </div>
               ))}
+              
+              {(!caso?.actividades || caso.actividades.length === 0) && (
+                <p className="text-gray-500 text-center py-4">No hay actividades registradas</p>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Columna lateral - Metadatos y acciones */}
+        {/* Sidebar - Información de Estado */}
         <div className="space-y-6">
-          {/* Fechas importantes */}
+          {/* Estado del Workflow */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Estado del Proceso</h2>
+            
+            <div className="space-y-3">
+              {['RECIBIDO', 'ASIGNADO', 'EN_REDACCIÓN', 'EN_REVISION', 'EN_APROBACION', 'FIRMA_LEGAL', 'LISTO_ENVIO', 'ENVIADO', 'CON_ACUSE'].map((etapa, index) => (
+                <div key={etapa} className="flex items-center space-x-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    index <= ['RECIBIDO', 'ASIGNADO', 'EN_REDACCIÓN', 'EN_REVISION', 'EN_APROBACION'].indexOf(caso.etapaAprobacion) 
+                      ? 'bg-green-100 text-green-600' 
+                      : 'bg-gray-100 text-gray-400'
+                  }`}>
+                    {index <= ['RECIBIDO', 'ASIGNADO', 'EN_REDACCIÓN', 'EN_REVISION', 'EN_APROBACION'].indexOf(caso.etapaAprobacion) ? (
+                      <CheckCircle size={16} />
+                    ) : (
+                      <Clock size={16} />
+                    )}
+                  </div>
+                  <span className={`text-sm ${
+                    index <= ['RECIBIDO', 'ASIGNADO', 'EN_REDACCIÓN', 'EN_REVISION', 'EN_APROBACION'].indexOf(caso.etapaAprobacion)
+                      ? 'text-green-700 font-medium'
+                      : 'text-gray-500'
+                  }`}>
+                    {etapa.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Información de Fechas */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Fechas</h2>
             
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Mail size={16} className="text-gray-400" />
-                  <span className="text-sm text-gray-600">Recibido</span>
-                </div>
-                <span className="text-sm text-gray-900">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Recepción:</span>
+                <span className="text-sm font-medium">
                   {new Date(caso.fechaRecepcion).toLocaleDateString('es-ES')}
                 </span>
               </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Calendar size={16} className="text-gray-400" />
-                  <span className="text-sm text-gray-600">Vencimiento</span>
-                </div>
-                <span className="text-sm text-gray-900">
+              
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Vencimiento:</span>
+                <span className="text-sm font-medium text-red-600">
                   {new Date(caso.fechaVencimiento).toLocaleDateString('es-ES')}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Días restantes:</span>
+                <span className="text-sm font-medium">
+                  {Math.ceil((new Date(caso.fechaVencimiento).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} días
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Documentos adjuntos */}
+          {/* Responsable */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Documentos</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Responsable</h2>
             
-            <div className="space-y-3">
-              {caso.documentos.map((documento: any) => (
-                <div key={documento.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Paperclip size={16} className="text-gray-400" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{documento.nombre}</p>
-                      <p className="text-xs text-gray-500">
-                        {(documento.tamaño / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                  </div>
-                  <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                    Descargar
-                  </button>
-                </div>
-              ))}
-              
-              <button className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
-                <div className="flex flex-col items-center space-y-2">
-                  <Paperclip size={20} className="text-gray-400" />
-                  <span className="text-sm text-gray-600">Agregar documento</span>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Acciones rápidas */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Acciones</h2>
-            
-            <div className="space-y-3">
-              <button className="w-full flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors justify-center">
-                <MessageSquare size={16} />
-                <span>Agregar Comentario</span>
-              </button>
-              
-              <button className="w-full flex items-center space-x-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors justify-center">
-                <User size={16} />
-                <span>Asignar Responsable</span>
-              </button>
-              
-              <button className="w-full flex items-center space-x-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors justify-center">
-                <Calendar size={16} />
-                <span>Cambiar Fecha</span>
-              </button>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <Users className="text-blue-600" size={20} />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">{caso.responsable.name}</p>
+                <p className="text-sm text-gray-600">{caso.responsable.email}</p>
+                {caso.responsable.cargo && (
+                  <p className="text-sm text-gray-500">{caso.responsable.cargo}</p>
+                )}
+              </div>
             </div>
           </div>
         </div>

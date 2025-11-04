@@ -1,8 +1,7 @@
-// src/app/dashboard/page.tsx
-
 'use client';
 
 import { useSession } from 'next-auth/react';
+import { useState, useEffect } from 'react';
 import { 
   BarChart3, 
   Inbox, 
@@ -10,90 +9,120 @@ import {
   CheckCircle, 
   Clock, 
   AlertTriangle,
-  FileText} from 'lucide-react';
+  Users,
+  FileText
+} from 'lucide-react';
+
+interface DashboardData {
+  totalCasos: number;
+  casosPendientes: number;
+  casosPorVencer: number;
+  casosResueltos: number;
+  casosRecientes: any[];
+  tiempoPromedioRespuesta: number;
+}
 
 export default function DashboardPage() {
-  // 1. Obtener la sesión del usuario
   const { data: session } = useSession();
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Datos de ejemplo para el dashboard
+  // Cargar datos del dashboard
+  useEffect(() => {
+    const cargarDashboardData = async () => {
+      try {
+        // Por ahora usamos datos mock, pero puedes crear una API específica para el dashboard
+        const mockData: DashboardData = {
+          totalCasos: 24,
+          casosPendientes: 8,
+          casosPorVencer: 3,
+          casosResueltos: 16,
+          tiempoPromedioRespuesta: 2.5,
+          casosRecientes: [
+            { id: 1, entidad: 'SUI', asunto: 'Reporte mensual de consumo', fecha: '2024-01-15', estado: 'PENDIENTE' },
+            { id: 2, entidad: 'SS', asunto: 'Consulta tarifaria', fecha: '2024-01-14', estado: 'EN_REVISION' },
+            { id: 3, entidad: 'MME', asunto: 'Solicitud de viabilidad', fecha: '2024-01-13', estado: 'CERRADO' },
+          ]
+        };
+        
+        setDashboardData(mockData);
+      } catch (error) {
+        console.error('Error cargando dashboard:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarDashboardData();
+  }, []);
+
   const stats = [
     { 
       name: 'Total Casos', 
-      value: '24', 
+      value: dashboardData?.totalCasos.toString() || '0', 
       change: '+12%', 
       changeType: 'positive',
-      icon: FileText, // Icono FileText (Total Casos)
+      icon: Inbox,
       color: 'blue'
     },
     { 
       name: 'Pendientes', 
-      value: '8', 
+      value: dashboardData?.casosPendientes.toString() || '0', 
       change: '-2%', 
       changeType: 'negative',
-      icon: Clock, // Icono Clock
+      icon: Clock,
       color: 'yellow'
     },
     { 
       name: 'Por Vencer', 
-      value: '3', 
+      value: dashboardData?.casosPorVencer.toString() || '0', 
       change: '+1', 
       changeType: 'negative',
-      icon: AlertTriangle, // Icono AlertTriangle
+      icon: AlertTriangle,
       color: 'red'
     },
     { 
       name: 'Resueltos', 
-      value: '16', 
+      value: dashboardData?.casosResueltos.toString() || '0', 
       change: '+15%', 
       changeType: 'positive',
-      icon: CheckCircle, // Icono CheckCircle
+      icon: CheckCircle,
       color: 'green'
     },
   ];
 
-  const recentCases = [
-    { id: 1, entidad: 'SUI', asunto: 'Reporte mensual de consumo', fecha: '2024-01-15', estado: 'Pendiente' },
-    { id: 2, entidad: 'SS', asunto: 'Consulta tarifaria', fecha: '2024-01-14', estado: 'En revisión' },
-    { id: 3, entidad: 'MME', asunto: 'Solicitud de viabilidad', fecha: '2024-01-13', estado: 'Aprobado' },
-  ];
-
-  // 2. Manejo del estado de carga de la sesión (Opcional, pero buena práctica)
-  // Si la sesión aún no ha cargado, se puede mostrar un spinner o pantalla de carga.
-  // En este caso, simplemente retornamos null o un layout básico para evitar errores si accedemos a session.user
-  if (!session) {
-      // Nota: Si se accede a esta página sin sesión, el middleware debería redirigir a /login.
-      // Si el estado es 'loading', podemos retornar un esqueleto.
-      return (
-          <div className="flex items-center justify-center h-full text-gray-500">
-              Cargando sesión...
-          </div>
-      );
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      {/* Encabezado de bienvenida personalizado */}
+      {/* Encabezado de bienvenida */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Bienvenido, {session.user.name} 👋
+          Bienvenido, {session?.user?.name} 👋
         </h1>
         <p className="text-gray-600">
-          {session.user.cargo && `${session.user.cargo} • `} 
-          {session.user.proceso && `${session.user.proceso} • `}
-          Rol: {session.user.role?.replace(/_/g, ' ')}
+          {session?.user?.cargo && `${session.user.cargo} • `} 
+          {session?.user?.proceso && `${session.user.proceso} • `}
+          Rol: {session?.user?.role?.replace(/_/g, ' ')}
         </p>
       </div>
 
       {/* Métricas principales */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
-          // El icono se accede dinámicamente
           const Icon = stat.icon;
           return (
-            // Uso de clases Tailwind dinámicas (bg-*, text-*)
             <div key={stat.name} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-start justify-between">
+              <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{stat.name}</p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
@@ -103,8 +132,18 @@ export default function DashboardPage() {
                     {stat.change} vs mes anterior
                   </p>
                 </div>
-                <div className={`p-3 rounded-lg bg-${stat.color}-100 flex-shrink-0`}>
-                  <Icon className={`text-${stat.color}-600`} size={24} />
+                <div className={`p-3 rounded-lg ${
+                  stat.color === 'blue' ? 'bg-blue-100' :
+                  stat.color === 'yellow' ? 'bg-yellow-100' :
+                  stat.color === 'red' ? 'bg-red-100' :
+                  'bg-green-100'
+                }`}>
+                  <Icon className={
+                    stat.color === 'blue' ? 'text-blue-600' :
+                    stat.color === 'yellow' ? 'text-yellow-600' :
+                    stat.color === 'red' ? 'text-red-600' :
+                    'text-green-600'
+                  } size={24} />
                 </div>
               </div>
             </div>
@@ -112,42 +151,36 @@ export default function DashboardPage() {
         })}
       </div>
 
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Casos Recientes */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Casos Recientes</h2>
-            {/* Aquí deberías usar un Link de Next.js si quieres navegar */}
             <a href="/dashboard/bandeja" className="text-blue-600 hover:text-blue-700 text-sm font-medium">
               Ver todos
             </a>
           </div>
           <div className="space-y-4">
-            {recentCases.map((caseItem) => (
-              <a 
-                key={caseItem.id} 
-                href={`/dashboard/bandeja/${caseItem.id}`}
-                className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-              >
+            {dashboardData?.casosRecientes.map((caseItem) => (
+              <div key={caseItem.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
                 <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0"></div>
-                  <div className="truncate">
-                    <p className="text-sm font-medium text-gray-900 truncate">{caseItem.entidad}</p>
-                    <p className="text-sm text-gray-600 truncate">{caseItem.asunto}</p>
+                  <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{caseItem.entidad}</p>
+                    <p className="text-sm text-gray-600">{caseItem.asunto}</p>
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0 ml-4">
+                <div className="text-right">
                   <p className="text-sm text-gray-600">{caseItem.fecha}</p>
-                  <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full mt-1 ${
-                    caseItem.estado === 'Pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                    caseItem.estado === 'En revisión' ? 'bg-blue-100 text-blue-800' :
+                  <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                    caseItem.estado === 'PENDIENTE' ? 'bg-yellow-100 text-yellow-800' :
+                    caseItem.estado === 'EN_REVISION' ? 'bg-blue-100 text-blue-800' :
                     'bg-green-100 text-green-800'
                   }`}>
                     {caseItem.estado}
                   </span>
                 </div>
-              </a>
+              </div>
             ))}
           </div>
         </div>
@@ -156,34 +189,22 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Acciones Rápidas</h2>
           <div className="grid grid-cols-2 gap-4">
-            <a 
-              href="/dashboard/bandeja"
-              className="p-4 border border-gray-200 rounded-lg text-center hover:bg-blue-50 hover:border-blue-300 transition-colors"
-            >
+            <a href="/dashboard/bandeja" className="p-4 border border-gray-200 rounded-lg text-center hover:bg-gray-50 transition-colors block">
               <Inbox className="mx-auto text-blue-600 mb-2" size={24} />
               <p className="text-sm font-medium text-gray-900">Revisar Bandeja</p>
-              <p className="text-xs text-gray-600">8 pendientes</p>
+              <p className="text-xs text-gray-600">{dashboardData?.casosPendientes || 0} pendientes</p>
             </a>
-            <a 
-              href="/dashboard/calendario"
-              className="p-4 border border-gray-200 rounded-lg text-center hover:bg-green-50 hover:border-green-300 transition-colors"
-            >
+            <a href="/dashboard/calendario" className="p-4 border border-gray-200 rounded-lg text-center hover:bg-gray-50 transition-colors block">
               <Calendar className="mx-auto text-green-600 mb-2" size={24} />
               <p className="text-sm font-medium text-gray-900">Ver Calendario</p>
-              <p className="text-xs text-gray-600">3 por vencer</p>
+              <p className="text-xs text-gray-600">{dashboardData?.casosPorVencer || 0} por vencer</p>
             </a>
-            <a 
-              href="/dashboard/nuevo-reporte"
-              className="p-4 border border-gray-200 rounded-lg text-center hover:bg-purple-50 hover:border-purple-300 transition-colors"
-            >
+            <a href="/dashboard/documentos" className="p-4 border border-gray-200 rounded-lg text-center hover:bg-gray-50 transition-colors block">
               <FileText className="mx-auto text-purple-600 mb-2" size={24} />
               <p className="text-sm font-medium text-gray-900">Nuevo Reporte</p>
               <p className="text-xs text-gray-600">Generar documento</p>
             </a>
-            <a 
-              href="/dashboard/metricas"
-              className="p-4 border border-gray-200 rounded-lg text-center hover:bg-orange-50 hover:border-orange-300 transition-colors"
-            >
+            <a href="/dashboard/metricas" className="p-4 border border-gray-200 rounded-lg text-center hover:bg-gray-50 transition-colors block">
               <BarChart3 className="mx-auto text-orange-600 mb-2" size={24} />
               <p className="text-sm font-medium text-gray-900">Ver Métricas</p>
               <p className="text-xs text-gray-600">Estadísticas</p>

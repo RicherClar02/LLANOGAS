@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - VERSIÓN MEJORADA
+// src/app/dashboard/layout.tsx - VERSIÓN CORREGIDA
 
 'use client';
 
@@ -8,7 +8,7 @@ import { useEffect, useMemo } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 
-// Definición de tipos de roles (Ayuda a la legibilidad y seguridad)
+// Definición de tipos de roles
 type ValidRole = 
   | 'ADMINISTRADOR_SISTEMA'
   | 'ADMINISTRADOR_ASIGNACIONES' 
@@ -26,7 +26,6 @@ export default function DashboardLayout({
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // Memoizar la lista de roles válidos para evitar recreación innecesaria
   const validRoles: ValidRole[] = useMemo(() => [
     'ADMINISTRADOR_SISTEMA',
     'ADMINISTRADOR_ASIGNACIONES', 
@@ -37,12 +36,9 @@ export default function DashboardLayout({
     'AUDITOR'
   ], []);
 
-
   useEffect(() => {
-    // 1. Esperar a que NextAuth cargue el estado
     if (status === 'loading') return; 
 
-    // 2. Redirigir si no hay sesión (No autenticado)
     if (!session) {
       router.push('/login');
       return;
@@ -50,18 +46,14 @@ export default function DashboardLayout({
 
     const userRole = session.user?.role;
 
-    // 3. Redirigir si el rol no es válido (No autorizado)
     if (!userRole || !validRoles.includes(userRole as ValidRole)) {
       router.push('/unauthorized');
       return;
     }
 
-    // Nota: Si el usuario está autenticado y su rol es válido, no se hace nada, 
-    // y el componente se renderiza con el contenido.
-
   }, [session, status, router, validRoles]);
 
-  // Renderizado durante el estado de carga
+  // Estado de carga
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -73,26 +65,39 @@ export default function DashboardLayout({
     );
   }
 
-  // Si la sesión no existe, devuelve null para evitar un parpadeo de contenido 
-  // antes de que se ejecute la redirección del useEffect.
+  // Si no hay sesión, no renderizar nada (la redirección se maneja en useEffect)
   if (!session) {
-    return null; 
+    return null;
   }
 
-  // Una vez que la sesión existe y el rol ha sido verificado (gracias al useEffect), 
-  // se renderiza el dashboard.
-  
-  // Se usa 'session.user!' para indicar a TypeScript que en este punto 
-  // estamos seguros de que existe, resolviendo el error de tipos.
+  // Verificación adicional de seguridad antes de renderizar
+  if (!session.user?.role || !validRoles.includes(session.user.role as ValidRole)) {
+    return null;
+  }
+
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar - Se pasa el objeto user completo que contiene el rol y otros datos */}
-      <Sidebar user={session.user!} /> 
+      {/* Sidebar con verificación segura */}
+      <Sidebar user={{
+        id: session.user.id,
+        name: session.user.name || 'Usuario',
+        email: session.user.email || '',
+        role: session.user.role,
+        cargo: session.user.cargo || undefined, // CORRECCIÓN: Convierte null/undefined a undefined
+        proceso: session.user.proceso || undefined // CORRECCIÓN: Convierte null/undefined a undefined
+      }} />
       
       {/* Contenido Principal */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <Header user={session.user!} />
+        {/* Header - Asegúrate de que el componente Header acepte las mismas props */}
+        <Header user={{
+          id: session.user.id,
+          name: session.user.name || 'Usuario',
+          email: session.user.email || '',
+          role: session.user.role,
+          cargo: session.user.cargo || undefined, // CORRECCIÓN: Convierte null/undefined a undefined
+          proceso: session.user.proceso || undefined // CORRECCIÓN: Convierte null/undefined a undefined
+        }} />
         
         {/* Contenido de la página */}
         <main className="flex-1 overflow-y-auto p-6">

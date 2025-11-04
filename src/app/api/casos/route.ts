@@ -127,9 +127,12 @@ export async function POST(request: NextRequest) {
         descripcion,
         prioridad: prioridad || 'MEDIA',
         estado: 'PENDIENTE',
+        etapaAprobacion: 'RECIBIDO',
+        tipoSolicitud: 'SOLICITUD_INFORMACION', // Valor por defecto
         entidadId,
         fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : null,
-        responsableId: session.user.id, // Auto-asignar al usuario actual
+        responsableId: session.user.id,
+        creadorId: session.user.id
       },
       include: {
         entidad: {

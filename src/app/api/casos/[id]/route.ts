@@ -1,5 +1,5 @@
 // src/app/api/casos/[id]/route.ts
-// API para operaciones específicas de un caso - GET, PUT, DELETE
+// API para operaciones específicas de un caso - GET, PUT
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
@@ -28,24 +28,22 @@ export async function GET(
             nombre: true,
             sigla: true,
             color: true,
-            email: true
+            tiempoRespuestaDias: true
           }
         },
         responsable: {
           select: {
             id: true,
             name: true,
-            email: true
+            email: true,
+            cargo: true
           }
         },
-        email: {
+        creador: {
           select: {
             id: true,
-            from: true,
-            subject: true,
-            body: true,
-            fecha: true,
-            attachments: true
+            name: true,
+            email: true
           }
         },
         actividades: {
@@ -80,7 +78,7 @@ export async function GET(
       return NextResponse.json({ error: 'Caso no encontrado' }, { status: 404 });
     }
 
-    return NextResponse.json({ caso });
+    return NextResponse.json(caso);
   } catch (error) {
     console.error('Error al obtener caso:', error);
     return NextResponse.json(
@@ -103,7 +101,15 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { asunto, descripcion, prioridad, estado, responsableId, fechaVencimiento } = body;
+    const { 
+      asunto, 
+      descripcion, 
+      prioridad, 
+      estado, 
+      etapaAprobacion,
+      responsableId, 
+      fechaVencimiento 
+    } = body;
 
     // Verificar que el caso existe
     const casoExistente = await prisma.caso.findUnique({
@@ -122,8 +128,10 @@ export async function PUT(
         ...(descripcion !== undefined && { descripcion }),
         ...(prioridad && { prioridad }),
         ...(estado && { estado }),
+        ...(etapaAprobacion && { etapaAprobacion }),
         ...(responsableId && { responsableId }),
-        ...(fechaVencimiento && { fechaVencimiento: new Date(fechaVencimiento) })
+        ...(fechaVencimiento && { fechaVencimiento: new Date(fechaVencimiento) }),
+        updatedAt: new Date()
       },
       include: {
         entidad: {
@@ -140,24 +148,25 @@ export async function PUT(
             name: true,
             email: true
           }
+        },
+        actividades: {
+          include: {
+            usuario: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            fecha: 'desc'
+          },
+          take: 10
         }
       }
     });
 
-    // Crear actividad de actualización
-    await prisma.actividad.create({
-      data: {
-        tipo: 'CAMBIO_ESTADO',
-        descripcion: `Caso actualizado - Estado: ${estado || casoExistente.estado}`,
-        casoId: params.id,
-        usuarioId: session.user.id
-      }
-    });
-
-    return NextResponse.json({ 
-      caso: casoActualizado,
-      message: 'Caso actualizado exitosamente'
-    });
+    return NextResponse.json(casoActualizado);
   } catch (error) {
     console.error('Error al actualizar caso:', error);
     return NextResponse.json(
