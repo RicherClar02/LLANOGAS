@@ -1,44 +1,33 @@
-// src/types/next-auth.d.ts
-// Extensión de tipos para NextAuth
-import { DefaultSession } from "next-auth";
-import { JWT } from "next-auth/jwt";
+import NextAuth, { DefaultSession, DefaultUser } from 'next-auth';
+import { JWT, DefaultJWT } from 'next-auth/jwt';
+import { UserRole } from '@prisma/client'; // <-- IMPORTANTE: Importar el enum
 
-// ------------------------------------
-// EXTENSIÓN PARA EL OBJETO DE SESIÓN
-// ------------------------------------
-declare module "next-auth" {
+declare module 'next-auth' {
+  /**
+   * Extiende la sesión para incluir el id y el rol.
+   */
   interface Session {
     user: {
       id: string;
-      email: string;
-      name: string;
-      role: string;
-      cargo?: string; // 👈 Campo nuevo (opcional)
-      proceso?: string; // 👈 Campo nuevo (opcional)
-    } & DefaultSession["user"];
+      role: UserRole; // <-- CAMBIO CLAVE
+    } & DefaultSession['user'];
   }
 
-  // ------------------------------------
-  // EXTENSIÓN PARA EL OBJETO DE USUARIO (USADO EN 'authorize')
-  // ------------------------------------
-  interface User {
+  /**
+   * Extiende el usuario para incluir el id y el rol.
+   */
+  interface User extends DefaultUser {
     id: string;
-    email: string;
-    name: string;
-    role: string;
-    cargo?: string; // 👈 Campo nuevo (opcional)
-    proceso?: string; // 👈 Campo nuevo (opcional)
+    role: UserRole; // <-- CAMBIO CLAVE
   }
 }
 
-// ------------------------------------
-// EXTENSIÓN PARA EL OBJETO JWT
-// ------------------------------------
-declare module "next-auth/jwt" {
-  interface JWT {
+declare module 'next-auth/jwt' {
+  /**
+   * Extiende el token JWT para incluir el id y el rol.
+   */
+  interface JWT extends DefaultJWT {
     id: string;
-    role: string;
-    cargo?: string; // 👈 Campo nuevo (opcional)
-    proceso?: string; // 👈 Campo nuevo (opcional)
+    role: UserRole; // <-- CAMBIO CLAVE
   }
 }

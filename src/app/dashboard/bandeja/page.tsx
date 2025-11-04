@@ -1,4 +1,3 @@
-// src/app/dashboard/bandeja/page.tsx - VERSIÓN CON DATOS REALES
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -311,7 +310,7 @@ export default function BandejaPage() {
                     {caso.descripcion && (
                       <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                         {caso.descripcion}
-                      </p>
+                      </g>
                     )}
 
                     {/* Información inferior */}

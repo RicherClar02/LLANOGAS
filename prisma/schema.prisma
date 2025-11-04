@@ -1,58 +1,61 @@
-// prisma/schema.prisma - VERSIÓN CORREGIDA
+// prisma/schema.prisma - VERSIÓN AVANZADA Y COMPLETA
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = "postgresql://postgres:Richer02@localhost:5432/llanogas?schema=public"
+  // Asegúrate de que tu URL de conexión sea la correcta.
+  // Si sigues usando SQLite, cambia "postgresql" a "sqlite" y la url.
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  role      UserRole @default(GESTOR)
+  id        String    @id @default(uuid()) // Cambiado de cuid() a uuid() para consistencia
+  email     String    @unique
+  name      String?   // 'name' debe ser opcional para el login
+  role      UserRole  @default(GESTOR)   // <-- CAMBIO CLAVE
   password  String
-  activo    Boolean  @default(true)
+  activo    Boolean   @default(true)
   
   // Información adicional para auditoría
-  cargo       String?
-  proceso     String?
+  cargo         String?
+  proceso       String?
   idColaborador String?
   
   // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   fechaInactivacion DateTime?
 
-  // Relations - CORREGIDAS
-  casosAsignados   Caso[]      @relation("CasosAsignados")
-  actividades      Actividad[]
-  documentos       Documento[]
-  casosCreados     Caso[]      @relation("CasosCreados")
-  revisiones       Revision[]
-  aprobaciones     Aprobacion[]
-  entidadesResponsable Entidad[] @relation("ResponsableEntidad")
+  // Relations
+  casosAsignados       Caso[]       @relation("CasosAsignados")
+  actividades          Actividad[]
+  documentos           Documento[]
+  casosCreados         Caso[]       @relation("CasosCreados")
+  revisiones           Revision[]
+  aprobaciones         Aprobacion[]
+  entidadesResponsable Entidad[]    @relation("ResponsableEntidad")
 
   @@map("users")
 }
 
 model Entidad {
-  id          String   @id @default(cuid())
-  nombre      String   @unique
-  sigla       String
-  email       String?
+  id        String  @id @default(uuid()) // Cambiado de cuid() a uuid()
+  nombre    String  @unique
+  sigla     String? // Sigla puede ser opcional
+  email     String?
   descripcion String?
-  color       String
-  activo      Boolean  @default(true)
+  color     String? // Color puede ser opcional
+  activo    Boolean @default(true)
 
   // Campos para clasificación automática
-  dominiosCorreo String[]
-  palabrasClave  String[]
-  tiempoRespuestaDias Int
+  dominiosCorreo        String[]
+  palabrasClave         String[]
+  tiempoRespuestaDias   Int? // Puede ser opcional
 
-  // Responsable por defecto - CORREGIDA
+  // Responsable por defecto
   responsablePorDefectoId String?
   responsablePorDefecto   User?   @relation("ResponsableEntidad", fields: [responsablePorDefectoId], references: [id])
 
@@ -66,48 +69,48 @@ model Entidad {
 }
 
 model Caso {
-  id          String     @id @default(cuid())
+  id          String   @id @default(uuid()) // Cambiado de cuid() a uuid()
   asunto      String
   descripcion String?
-  prioridad   Prioridad  @default(MEDIA)
-  estado      EstadoCaso @default(PENDIENTE)
+  prioridad   Prioridad @default(MEDIA)
+  estado      EstadoCaso @default(PENDIENTE) // <-- CAMBIO CLAVE
   
   // Workflow de aprobación
   etapaAprobacion EtapaAprobacion @default(RECIBIDO)
-  tipoSolicitud   TipoSolicitud
+  tipoSolicitud   TipoSolicitud? // Puede ser opcional al inicio
 
   // Información de radicados
   numeroRadicadoEntrada String?
   numeroRadicadoSalida  String?
-  idGLPI               String?
+  idGLPI                String?
 
   // Relación con email original
   emailId String? @unique
   email   Email?  @relation(fields: [emailId], references: [id])
 
-  // Entidad y responsables - CORREGIDAS
+  // Entidad y responsables
   entidadId String
   entidad   Entidad @relation(fields: [entidadId], references: [id])
 
   responsableId String?
   responsable   User?   @relation("CasosAsignados", fields: [responsableId], references: [id], onDelete: SetNull)
 
-  creadorId String
-  creador   User    @relation("CasosCreados", fields: [creadorId], references: [id])
+  creadorId String? // Puede ser opcional si el sistema lo crea
+  creador   User?   @relation("CasosCreados", fields: [creadorId], references: [id])
 
   // Fechas del workflow
-  fechaRecepcion   DateTime  @default(now())
-  fechaVencimiento DateTime?
+  fechaRecepcion       DateTime  @default(now())
+  fechaVencimiento     DateTime?
   fechaInicioRedaccion DateTime?
-  fechaEnvioRevision DateTime?
-  fechaRevision    DateTime?
+  fechaEnvioRevision   DateTime?
+  fechaRevision        DateTime?
   fechaEnvioAprobacion DateTime?
-  fechaAprobacion  DateTime?
-  fechaEnvioFirma  DateTime?
-  fechaFirmaLegal  DateTime?
-  fechaEnvioFinal  DateTime?
-  fechaAcuseRecibo DateTime?
-  fechaCierre      DateTime?
+  fechaAprobacion      DateTime?
+  fechaEnvioFirma      DateTime?
+  fechaFirmaLegal      DateTime?
+  fechaEnvioFinal      DateTime?
+  fechaAcuseRecibo     DateTime?
+  fechaCierre          DateTime?
 
   // Relations
   actividades  Actividad[]
@@ -123,7 +126,7 @@ model Caso {
 }
 
 model Email {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid()) // Cambiado de cuid() a uuid()
   messageId String   @unique
   from      String
   to        String
@@ -132,14 +135,14 @@ model Email {
   html      String?
   fecha     DateTime
 
-  // Adjuntos
+  // Adjuntos (JSON es más flexible para almacenar listas de archivos)
   attachments Json?
 
   // Procesamiento
   entidadDetectada   String?
   prioridadDetectada Prioridad?
-  procesado          Boolean    @default(false)
-  clasificado        Boolean    @default(false)
+  procesado          Boolean   @default(false)
+  clasificado        Boolean   @default(false)
 
   caso Caso?
 
@@ -149,31 +152,32 @@ model Email {
 }
 
 model Actividad {
-  id          String        @id @default(cuid())
+  id          String        @id @default(uuid()) // Cambiado de cuid() a uuid()
   tipo        TipoActividad
   descripcion String
   metadata    Json?
+  archivoUrl  String?       // <-- Mantenemos el campo de archivo
 
-  casoId    String
-  caso      Caso   @relation(fields: [casoId], references: [id])
+  casoId String
+  caso   Caso   @relation(fields: [casoId], references: [id])
 
   usuarioId String
   usuario   User   @relation(fields: [usuarioId], references: [id])
 
-  fecha     DateTime @default(now())
+  fecha DateTime @default(now())
 
   @@map("actividades")
 }
 
 model Documento {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid()) // Cambiado de cuid() a uuid()
   nombre    String
   tipo      String
-  url       String
-  tamano    Int
+  url       String   // URL al almacenamiento (S3, GCS, o local /public/uploads)
+  tamano    Int?
   version   Int      @default(1)
   
-  driveId   String?
+  driveId     String?
   esPlantilla Boolean @default(false)
 
   casoId String?
@@ -189,40 +193,40 @@ model Documento {
 }
 
 model Revision {
-  id        String   @id @default(cuid())
+  id        String         @id @default(uuid()) // Cambiado de cuid() a uuid()
   estado    EstadoRevision @default(PENDIENTE)
   comentario String?
   
-  casoId    String
-  caso      Caso    @relation(fields: [casoId], references: [id])
+  casoId String
+  caso   Caso   @relation(fields: [casoId], references: [id])
   
   revisorId String
-  revisor   User    @relation(fields: [revisorId], references: [id])
+  revisor   User   @relation(fields: [revisorId], references: [id])
   
-  fechaAsignacion DateTime @default(now())
+  fechaAsignacion DateTime  @default(now())
   fechaRevision   DateTime?
   
   @@map("revisiones")
 }
 
 model Aprobacion {
-  id        String   @id @default(cuid())
+  id        String           @id @default(uuid()) // Cambiado de cuid() a uuid()
   estado    EstadoAprobacion @default(PENDIENTE)
   comentario String?
   
   casoId      String
-  caso        Caso    @relation(fields: [casoId], references: [id])
+  caso        Caso   @relation(fields: [casoId], references: [id])
   
   aprobadorId String
-  aprobador   User    @relation(fields: [aprobadorId], references: [id])
+  aprobador   User   @relation(fields: [aprobadorId], references: [id])
   
-  fechaAsignacion DateTime @default(now())
+  fechaAsignacion DateTime  @default(now())
   fechaAprobacion DateTime?
   
   @@map("aprobaciones")
 }
 
-// ENUMS
+// ENUMS (La parte más importante de esta actualización)
 enum UserRole {
   ADMINISTRADOR_SISTEMA
   ADMINISTRADOR_ASIGNACIONES
@@ -243,7 +247,7 @@ enum Prioridad {
 enum EstadoCaso {
   PENDIENTE
   ASIGNADO
-  EN_REDACCIÓN
+  EN_REDACCION
   EN_REVISION
   EN_APROBACION
   FIRMA_LEGAL
@@ -256,7 +260,7 @@ enum EstadoCaso {
 enum EtapaAprobacion {
   RECIBIDO
   ASIGNADO
-  EN_REDACCIÓN
+  EN_REDACCION
   EN_REVISION
   EN_APROBACION
   FIRMA_LEGAL
@@ -282,7 +286,7 @@ enum TipoActividad {
   CAMBIO_ESTADO
   COMENTARIO
   VENCIMIENTO
-  INICIO_REDACCIÓN
+  INICIO_REDACCION
   ENVIO_REVISION
   ENVIO_APROBACION
   APROBACION
