@@ -1,14 +1,16 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  // ...aquí pueden estar tus otras configuraciones...
-  reactStrictMode: true,
+// Configuración de Next.js para LLANOGAS
+import type { NextConfig } from 'next';
 
-  // --- AÑADE ESTO ---
-  // Le dice a Vercel que no falle el 'build' por errores de ESLint
-  eslint: {
-    ignoreDuringBuilds: true,
+const nextConfig: NextConfig = {
+  experimental: {
+   // appDir: true,
   },
-  // --- FIN DE LO AÑADIDO ---
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
