@@ -1,8 +1,7 @@
-@import "tailwindcss";
 /* Estilos Globales para LLANOGAS */
-/* @tailwind base;
+@tailwind base;
 @tailwind components;
-@tailwind utilities; */
+@tailwind utilities;
 
 :root {
   --foreground-rgb: 0, 0, 0;
@@ -10,13 +9,7 @@
   --background-end-rgb: 255, 255, 255;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
+/* Eliminamos el modo oscuro por defecto para mantener el texto visible */
 
 body {
   color: rgb(var(--foreground-rgb));
