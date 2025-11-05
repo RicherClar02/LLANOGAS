@@ -310,7 +310,7 @@ export default function BandejaPage() {
                     {caso.descripcion && (
                       <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                         {caso.descripcion}
-                      </g>
+                      </p>
                     )}
 
                     {/* Información inferior */}
