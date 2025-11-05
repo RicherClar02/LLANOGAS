@@ -61,11 +61,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Calcular tiempo promedio de respuesta (simplificado)
-    const casosCerrados = await prisma.caso.findMany({
+    const todosLosCasosCerrados = await prisma.caso.findMany({
       where: {
-        estado: 'CERRADO',
-        fechaRecepcion: { not: null },
-        fechaCierre: { not: null }
+        estado: 'CERRADO'
       },
       select: {
         fechaRecepcion: true,
@@ -73,16 +71,20 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    const casosConFechasCompletas = todosLosCasosCerrados.filter(
+      caso => caso.fechaRecepcion !== null && caso.fechaCierre !== null
+    );
+
     let tiempoPromedio = 0;
-    if (casosCerrados.length > 0) {
-      const totalDias = casosCerrados.reduce((acc, caso) => {
+    if (casosConFechasCompletas.length > 0) {
+      const totalDias = casosConFechasCompletas.reduce((acc, caso) => {
         const dias = Math.ceil(
-          (new Date(caso.fechaCierre!).getTime() - new Date(caso.fechaRecepcion).getTime()) / 
+          (new Date(caso.fechaCierre!).getTime() - new Date(caso.fechaRecepcion!).getTime()) / 
           (1000 * 60 * 60 * 24)
         );
         return acc + dias;
       }, 0);
-      tiempoPromedio = totalDias / casosCerrados.length;
+      tiempoPromedio = totalDias / casosConFechasCompletas.length;
     }
 
     return NextResponse.json({
@@ -93,10 +95,11 @@ export async function GET(request: NextRequest) {
       tiempoPromedioRespuesta: Math.round(tiempoPromedio * 10) / 10,
       casosRecientes: casosRecientes.map(caso => ({
         id: caso.id,
-        entidad: caso.entidad.sigla,
+        entidad: caso.entidad.sigla || 'N/A',
         asunto: caso.asunto,
         fecha: caso.fechaRecepcion.toISOString().split('T')[0],
-        estado: caso.estado
+        estado: caso.estado,
+        color: caso.entidad.color || '#6B7280'
       }))
     });
   } catch (error) {
@@ -105,5 +108,7 @@ export async function GET(request: NextRequest) {
       { error: 'Error interno del servidor' },
       { status: 500 }
     );
+  } finally {
+    await prisma.$disconnect();
   }
 }
