@@ -51,8 +51,8 @@ model Entidad {
   activo    Boolean @default(true)
 
   // Campos para clasificación automática
-  dominiosCorreo        String[]
-  palabrasClave         String[]
+  dominiosCorreo        Json?
+  palabrasClave         Json?
   tiempoRespuestaDias   Int? // Puede ser opcional
 
   // Responsable por defecto
