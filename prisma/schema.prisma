@@ -267,6 +267,7 @@ enum EtapaAprobacion {
   LISTO_ENVIO
   ENVIADO
   CON_ACUSE
+  CERRADO
 }
 
 enum TipoSolicitud {
