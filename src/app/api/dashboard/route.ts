@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const casosPendientes = await prisma.caso.count({
       where: {
         estado: {
-          in: ['PENDIENTE', 'ASIGNADO', 'EN_REDACCIÓN', 'EN_REVISION', 'EN_APROBACION']
+          in: ['PENDIENTE', 'ASIGNADO', 'EN_REDACCION', 'EN_REVISION', 'EN_APROBACION']
         }
       }
     });
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
           gte: new Date()
         },
         estado: {
-          in: ['PENDIENTE', 'ASIGNADO', 'EN_REDACCIÓN', 'EN_REVISION', 'EN_APROBACION']
+          in: ['PENDIENTE', 'ASIGNADO', 'EN_REDACCION', 'EN_REVISION', 'EN_APROBACION']
         }
       }
     });
