@@ -1,105 +1,135 @@
 // Página Principal - Landing Page de LLANOGAS
 'use client';
-import Link from 'next/link';
+import React from 'react';
+// Este componente asume que Tailwind CSS está disponible en el entorno de ejecución.
 
-export default function Home() {
+/**
+ * Interfaz de TypeScript para las propiedades del componente FeatureCard.
+ * Esto resuelve el error de 'implicit any type' en entornos TypeScript.
+ */
+interface FeatureCardProps {
+  icon: string;
+  title: string;
+  description: string;
+  color?: string; // Propiedad opcional
+}
+
+/**
+ * Componente para renderizar las tarjetas de funcionalidades.
+ * Aplica estilos modernos con sombras y efecto hover.
+ */
+const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, color }) => (
+  <div className="bg-white p-8 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] border border-blue-50/50">
+    <div className={`w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mb-5 border-4 border-blue-200/50`}>
+      {/* El color del ícono se fuerza a blue-700 para mantener la cohesión visual */}
+      <span className={`text-2xl text-blue-700`}>{icon}</span>
+    </div>
+    <h3 className="text-xl font-extrabold text-gray-900 mb-3">{title}</h3>
+    <p className="text-gray-600 text-base">{description}</p>
+  </div>
+);
+
+// El componente principal debe ser nombrado App y ser la exportación por defecto
+export default function App() {
+  const LLANOGAS_URL = "https://www.llanogas.com/";
+  // La ruta para Iniciar Sesión se mantiene, asumiendo que es el punto de acceso al sistema
+  const LOGIN_URL = "/login";
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+    // Fondo de la aplicación ahora es completamente blanco (bg-white)
+    <div className="min-h-screen font-sans bg-white">
+      
+      {/* Header - Sticky y Estilizado */}
+      <header className="sticky top-0 z-10 bg-white shadow-lg shadow-blue-50/50 border-b border-blue-100/50">
+        <div className="container mx-auto px-6 lg:px-10 py-4 flex justify-between items-center max-w-7xl">
           <div className="flex items-center space-x-2">
+            {/* Logo de LLANOGAS - SIN la función onError */}
             <img 
-                    src="/images/llanogas.png" 
-                    alt="Logo de Llanogas" 
-                    className="w-35 h-12"
-                    onError={(e) => { 
-                        e.currentTarget.onerror = null; 
-                        e.currentTarget.style.display = 'none';
-                        const span = document.createElement('span');
-                        span.textContent = 'LG';
-                        span.className = 'text-blue-800 text-sm font-extrabold';
-                        e.currentTarget.parentElement?.appendChild(span);
-                    }} 
-                />
+              src="/images/llanogas.png" 
+              alt="Logo de Llanogas" 
+              // Asegura que el logo tenga un buen tamaño en el header
+              className="w-auto h-12"
+            />
           </div>
-          <nav className="flex space-x-6">
-            <Link href="/login" className="text-gray-600 hover:text-blue-600 font-medium">
+          <nav className="flex items-center space-x-4 sm:space-x-8">
+            <a href="#features" className="text-gray-600 hover:text-blue-700 font-medium transition-colors hidden sm:block">
+              Características
+            </a>
+            <a 
+              href={LOGIN_URL} 
+              className="text-blue-700 font-bold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors border border-transparent"
+            >
               Iniciar Sesión
-            </Link>
-            <Link href="/register" className="text-gray-600 hover:text-blue-600 font-medium">
-              Registrarse
-            </Link>
+            </a>
+            {/* Botón: Ir a LLANOGAS (Redirige al sitio corporativo) */}
+            <a 
+              href={LLANOGAS_URL} 
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-blue-500/50 hover:bg-blue-800 transition-all duration-300 transform hover:scale-[1.02]"
+            >
+              Ir a LLANOGAS
+            </a>
           </nav>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <main className="container mx-auto px-4 py-16">
-        <div className="text-center max-w-4xl mx-auto">
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Sistema de Gestión de Reportes
-            <span className="text-blue-600 block">Entidades de Control</span>
+      {/* Hero Section - Diseño Centrado y Limpio */}
+      <main className="container mx-auto px-6 lg:px-10 py-24 lg:py-32 max-w-5xl">
+        <div className="text-center">
+          {/* Título y Subtítulo */}
+          <h1 className="text-6xl lg:text-7xl font-extrabold text-gray-900 leading-tight mb-6">
+            Gestión Regulatoria <span className="text-blue-600 block sm:inline">Simplificada.</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-            Centraliza y gestiona todos tus reportes a entidades de control desde una 
-            plataforma única. Automatiza procesos, recibe alertas y mantén el control 
-            total de tus obligaciones regulatorias.
+          <p className="text-xl text-gray-700 mb-12 leading-relaxed max-w-3xl mx-auto">
+            Centraliza y automatiza el <strong className="font-semibold">control y reporte</strong> de obligaciones ante todas las entidades reguladoras. Cumplimiento total, sin esfuerzo, enfocado en la transparencia LLANOGAS.
           </p>
-          <div className="flex justify-center space-x-4">
-            <Link 
-              href="/login" 
-              className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Comenzar Ahora
-            </Link>
-            <Link 
-              href="/dashboard" 
-              className="border border-blue-600 text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
-            >
-              Ver Demo
-            </Link>
-          </div>
-        </div>
-
-        {/* Features Grid */}
-        <div className="grid md:grid-cols-3 gap-8 mt-20">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-blue-600 font-bold">📨</span>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Bandeja Centralizada</h3>
-            <p className="text-gray-600">
-              Gestiona todos los correos de entidades en un solo lugar con clasificación automática.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-green-600 font-bold">🗓️</span>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Calendario Inteligente</h3>
-            <p className="text-gray-600">
-              Never pierdas un vencimiento con alertas proactivas y recordatorios automáticos.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-purple-600 font-bold">📊</span>
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Métricas en Tiempo Real</h3>
-            <p className="text-gray-600">
-              Monitorea el cumplimiento con dashboards interactivos y reportes exportables.
-            </p>
-          </div>
+          
+          {/* Botón CTA principal */}
+          <a 
+            href={LOGIN_URL} 
+            className="inline-flex items-center justify-center bg-blue-600 text-white text-xl px-12 py-4 rounded-xl font-bold shadow-lg shadow-blue-400/50 hover:bg-blue-700 transition-all duration-300 transform hover:translate-y-[-2px] hover:shadow-xl"
+          >
+            Comenzar Ahora
+          </a>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-20">
-        <div className="container mx-auto px-4 py-8 text-center text-gray-600">
-          <p>© 2026 LLANOGAS - Sistema de Gestión de Reportes. Todos los derechos reservados.</p>
+      {/* Sección de Características Destacadas - Fondo con un toque de azul muy claro */}
+      <div className="bg-blue-50/50 py-16" id="features"> 
+        <div className="container mx-auto px-6 lg:px-10 max-w-7xl">
+            <h2 className="text-4xl font-extrabold text-center text-gray-900 mb-16">
+                Funcionalidades Clave
+            </h2>
+            
+            {/* Grid de Features */}
+            <div className="grid md:grid-cols-3 gap-8">
+                <FeatureCard 
+                    icon="📩" 
+                    title="Bandeja Regulatoria Única"
+                    description="Clasifica automáticamente toda la correspondencia de las entidades de control, asegurando que nada se pierda."
+                />
+
+                <FeatureCard 
+                    icon="⚙️" 
+                    title="Automatización de Cumplimiento"
+                    description="Genera recordatorios, asigna responsables y documenta el proceso de respuesta para cada requerimiento."
+                />
+
+                <FeatureCard 
+                    icon="🚀" 
+                    title="Panel de Rendimiento (KPIs)"
+                    description="Visualiza el estado de cumplimiento en tiempo real con métricas claras y reportes exportables para auditoría."
+                />
+            </div>
+        </div>
+      </div>
+      
+
+      {/* Footer - Diseño Sencillo y Corporativo */}
+      <footer className="bg-blue-700 mt-20">
+        <div className="container mx-auto px-6 lg:px-10 py-6 max-w-7xl text-center text-white/80">
+          <p className="text-sm">© 2024 LLANOGAS - Sistema de Gestión de Reportes. | <span className="font-semibold">Cumplimiento Total. Control Absoluto.</span></p>
         </div>
       </footer>
     </div>
