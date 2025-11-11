@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -130,18 +130,17 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Enlace a registro */}
-        <div className="text-center mt-6">
-          <p className="text-gray-600">
-            ¿No tienes cuenta?{' '}
+        <div className="pt-4 text-center">
             <Link 
-              href="/register" 
-              className="text-blue-600 hover:text-blue-700 font-semibold transition-colors"
+                href="/" 
+                className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors font-medium text-sm"
             >
-              Regístrate aquí
+                <ArrowLeft size={16} className="mr-1" />
+                Regresar a la Página Principal
             </Link>
-          </p>
-        </div>
+          </div>
+
+
       </div>
     </div>
   );

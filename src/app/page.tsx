@@ -1,4 +1,5 @@
 // Página Principal - Landing Page de LLANOGAS
+// src/app/page.tsx
 'use client';
 import React from 'react';
 // Este componente asume que Tailwind CSS está disponible en el entorno de ejecución.
@@ -129,7 +130,7 @@ export default function App() {
       {/* Footer - Diseño Sencillo y Corporativo */}
       <footer className="bg-blue-700 mt-20">
         <div className="container mx-auto px-6 lg:px-10 py-6 max-w-7xl text-center text-white/80">
-          <p className="text-sm">© 2024 LLANOGAS - Sistema de Gestión de Reportes. | <span className="font-semibold">Cumplimiento Total. Control Absoluto.</span></p>
+          <p className="text-sm">© 2026 LLANOGAS - Sistema de Gestión de Reportes. | <span className="font-semibold">Cumplimiento Total. Control Absoluto.</span></p>
         </div>
       </footer>
     </div>
