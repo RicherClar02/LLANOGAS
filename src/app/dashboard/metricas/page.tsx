@@ -75,7 +75,7 @@ export default function MetricasPage() {
           <select
             value={rangoFecha}
             onChange={(e) => setRangoFecha(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 text-gray-700 focus:ring-blue-500"
           >
             <option value="7d">Últimos 7 días</option>
             <option value="30d">Últimos 30 días</option>

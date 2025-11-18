@@ -1,7 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { Calendar, Filter, Plus, Clock, AlertTriangle } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { 
+  Calendar, Filter, Clock, AlertTriangle, ChevronLeft, ChevronRight 
+} from 'lucide-react';
+import { 
+  format, 
+  addMonths, subMonths, 
+  addWeeks, subWeeks, 
+  addDays, subDays,
+  startOfWeek, endOfWeek // Importadas para manejar la vista semanal
+} from 'date-fns';
+import { es } from 'date-fns/locale';
+
+// Asegúrate de que estos componentes y utilidades existen en tus paths
+import { isDiaHabilColombiano } from '@/lib/colombia-utils';
+import CalendarGrid from '@/components/CalendarGrid';
 
 interface Evento {
   id: string;
@@ -17,7 +31,8 @@ export default function CalendarioPage() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
   const [vista, setVista] = useState<'mes' | 'semana' | 'dia'>('mes');
 
-  const eventos: Evento[] = [
+  // Datos de eventos de prueba
+  const eventos: Evento[] = useMemo(() => [
     {
       id: '1',
       title: 'Vencimiento - Reporte SUI',
@@ -36,7 +51,66 @@ export default function CalendarioPage() {
       entidad: 'Superservicios',
       prioridad: 'MUY_ALTA'
     }
-  ];
+  ], []);
+
+  // ******************************************************************
+  // 1. Lógica de Navegación Dinámica (handlePrev y handleNext)
+  // ******************************************************************
+
+  const handlePrev = useCallback(() => {
+    setFechaSeleccionada((prevDate) => {
+      switch (vista) {
+        case 'mes':
+          return subMonths(prevDate, 1);
+        case 'semana':
+          return subWeeks(prevDate, 1);
+        case 'dia':
+          return subDays(prevDate, 1);
+        default:
+          return prevDate;
+      }
+    });
+  }, [vista]);
+
+  const handleNext = useCallback(() => {
+    setFechaSeleccionada((prevDate) => {
+      switch (vista) {
+        case 'mes':
+          return addMonths(prevDate, 1);
+        case 'semana':
+          return addWeeks(prevDate, 1);
+        case 'dia':
+          return addDays(prevDate, 1);
+        default:
+          return prevDate;
+      }
+    });
+  }, [vista]);
+
+  // ******************************************************************
+  // 2. Título que se Adapta a la Vista (tituloNavegacion)
+  // ******************************************************************
+
+  const tituloNavegacion = useMemo(() => {
+    // Nota: El locale: es asegura que la semana comience en Lunes (estándar europeo/latino)
+    const options = { locale: es };
+    
+    switch (vista) {
+      case 'mes':
+        return format(fechaSeleccionada, 'MMMM yyyy', options);
+      case 'semana':
+        const start = startOfWeek(fechaSeleccionada, options);
+        const end = endOfWeek(fechaSeleccionada, options);
+        // Formato para Semana del Lunes X al Domingo Y
+        return `Semana del ${format(start, 'd MMMM', options)} al ${format(end, 'd MMMM yyyy', options)}`;
+      case 'dia':
+        // Formato para Miércoles, 18 de Noviembre 2025
+        return format(fechaSeleccionada, 'EEEE, d MMMM yyyy', options);
+      default:
+        return format(fechaSeleccionada, 'MMMM yyyy', options);
+    }
+  }, [fechaSeleccionada, vista]);
+
 
   const getEventoStyles = (evento: Evento) => {
     const baseStyles = 'p-2 rounded-lg text-sm font-medium';
@@ -81,6 +155,7 @@ export default function CalendarioPage() {
           </button>
           
           <div className="flex bg-gray-100 rounded-lg p-1">
+            {/* Los botones de vista ya funcionan al llamar a setVista */}
             {(['mes', 'semana', 'dia'] as const).map((vistaItem) => (
               <button
                 key={vistaItem}
@@ -103,7 +178,7 @@ export default function CalendarioPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Vencen esta semana</p>
+              <p className="text-sm font-medium text-gray-700">Vencen esta semana</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">3</p>
             </div>
             <div className="p-3 bg-red-100 rounded-lg">
@@ -183,25 +258,53 @@ export default function CalendarioPage() {
           </div>
         </div>
 
-        {/* Vista de calendario */}
+        {/* Vista de calendario (Controles y Grid Integrados) */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {fechaSeleccionada.toLocaleDateString('es-ES', { 
-                month: 'long', 
-                year: 'numeric' 
-              })}
-            </h2>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full flex flex-col">
             
-            {/* Aquí integrarías un componente de calendario real */}
-            <div className="aspect-video bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-              <div className="text-center">
-                <Calendar className="mx-auto text-gray-400 mb-2" size={32} />
-                <p className="text-gray-600">Vista de calendario</p>
-                <p className="text-sm text-gray-500">
-                  Integrar con librería de calendario como FullCalendar
-                </p>
+            {/* Controles de Navegación y Vista */}
+            <div className="flex justify-between items-center mb-4 flex-shrink-0">
+              <div className="flex items-center space-x-2">
+                {/* Botón Anterior - usa handlePrev */}
+                <button onClick={handlePrev} className="p-2 border rounded-full hover:bg-gray-100">
+                  <ChevronLeft size={16} className="text-indigo-600" />
+                </button>
+                {/* Título de Navegación Dinámico */}
+                <h2 className="text-xl font-semibold text-gray-900 capitalize">
+                  {tituloNavegacion}
+                </h2>
+                {/* Botón Siguiente - usa handleNext */}
+                <button onClick={handleNext} className="p-2 border rounded-full hover:bg-gray-100">
+                  <ChevronRight size={16} className="text-indigo-600" />
+                </button>
               </div>
+
+              {/* Botones de Vista (mes, semana, día) - Duplicado de la sección superior */}
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                {(['mes', 'semana', 'dia'] as const).map((vistaItem) => (
+                  <button
+                    key={vistaItem}
+                    onClick={() => setVista(vistaItem)}
+                    className={`px-3 py-1 rounded-md text-sm font-medium capitalize ${
+                      vista === vistaItem
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {vistaItem}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Área de Calendario */}
+            <div className="flex-grow">
+                {/* Es crucial que CalendarGrid use 'fechaSeleccionada' y 'vista' para renderizar el grid correcto */}
+                <CalendarGrid 
+                    currentDate={fechaSeleccionada} 
+                    events={eventos} 
+                    view={vista} // Asegúrate de que CalendarGrid acepte esta prop
+                />
             </div>
           </div>
         </div>

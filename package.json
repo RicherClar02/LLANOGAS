@@ -18,6 +18,7 @@
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
     "bcryptjs": "^3.0.2",
+    "date-fns": "^4.1.0",
     "googleapis": "^166.0.0",
     "i": "^0.3.7",
     "lucide-react": "^0.546.0",
