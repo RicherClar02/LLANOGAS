@@ -7,8 +7,8 @@ generator client {
 datasource db {
   // Asegúrate de que tu URL de conexión sea la correcta.
   // Si sigues usando SQLite, cambia "postgresql" a "sqlite" y la url.
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = "postgresql://postgres:12345Syb.@localhost:5432/llanogas?schema=public"
 }
 
 model User {
