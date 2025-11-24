@@ -181,55 +181,55 @@ export default function BandejaPage() {
         </div>
       </div>
 
-      {/* --- Barra de Filtros y Búsqueda --- */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-gray-500">
-          {/* Búsqueda */}
-          <div className="md:col-span-2">
-            <form onSubmit={handleSearch}>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="Buscar por radicado, asunto o entidad..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </form>
-          </div>
+     {/* --- Barra de Filtros y Búsqueda --- */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-gray-500">
+          {/* Búsqueda */}
+          <div className="md:col-span-2">
+            {/* ... (Código de Búsqueda) ... */}
+            <form onSubmit={handleSearch}>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Buscar por radicado, asunto o entidad..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </form>
+          </div>
 
-          {/* Filtro por Estado */}
-          <div>
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <select
-                value={estadoFilter}
-                onChange={(e) => { setEstadoFilter(e.target.value); setPage(1); }}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-gray-500"
-              >
-                {ESTADOS.map(estado => (
-                  <option key={estado.value} value={estado.value}>
-                    {estado.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          {/* Filtro por Estado (Columna 3) */}
+          <div> 
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <select
+                value={estadoFilter}
+                onChange={(e) => { setEstadoFilter(e.target.value); setPage(1); }}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-gray-500"
+              >
+                {ESTADOS.map(estado => (
+                  <option key={estado.value} value={estado.value}>
+                    {estado.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div> {/* CIERRE CORREGIDO del div de Filtro por Estado */}
 
-          {/* Botón Limpiar */}
-          <div>
-            <button 
-              onClick={() => { setEstadoFilter('TODOS'); setSearchQuery(''); setPage(1); }}
-              className="w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Limpiar Filtros
-            </button>
-          </div>
-        </div>
-      </div>
-
+          {/* Botón Limpiar (Columna 4) */}
+          <div>
+            <button 
+              onClick={() => { setEstadoFilter('TODOS'); setSearchQuery(''); setPage(1); }}
+              className="w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Limpiar Filtros
+            </button>
+          </div> {/* CIERRE CORREGIDO del div de Botón Limpiar */}
+        </div>
+      </div>
       {/* --- Tabla de Casos --- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
