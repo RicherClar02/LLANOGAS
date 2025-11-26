@@ -1,3 +1,4 @@
+//src/hooks/useNotifications.ts
 import { useState, useEffect, useCallback } from 'react';
 
 export interface Notification {

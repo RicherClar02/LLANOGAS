@@ -1,4 +1,4 @@
-// Detalle del Caso - Página Individual
+//src/app/dashboard/bandeja/[id]/page.tsx
 'use client';
 
 import { useSession } from 'next-auth/react';

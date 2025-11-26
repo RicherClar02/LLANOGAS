@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, Users, Clock, Download, Filter } from 'lucide-react';
 
 interface Metricas {
@@ -15,13 +15,41 @@ interface Metricas {
 export default function MetricasPage() {
   const [rangoFecha, setRangoFecha] = useState<'7d' | '30d' | '90d' | '1a'>('30d');
   const [loading, setLoading] = useState(false);
+  const [metricas, setMetricas] = useState<Metricas | null>(null);
 
-  const metricas: Metricas = {
+  // Cargar métricas desde la API
+  useEffect(() => {
+    const cargarMetricas = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/metricas?rango=${rangoFecha}`);
+        if (response.ok) {
+          const data = await response.json();
+          setMetricas(data);
+        } else {
+          console.error('Error cargando métricas');
+          // CORRECCIÓN: Lógica correcta del else
+          setMetricas(getMetricasMock());
+        }
+      } catch (error) {
+        console.error('Error cargando métricas:', error);
+        // Fallback con datos mock
+        setMetricas(getMetricasMock());
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarMetricas();
+  }, [rangoFecha]);
+
+  // Datos mock para fallback
+  const getMetricasMock = (): Metricas => ({
     tiempoPromedioRespuesta: 2.5,
     tasaCumplimiento: 85,
     casosPorEstado: [
       { estado: 'PENDIENTE', count: 8 },
-      { estado: 'EN_REDACCIÓN', count: 5 },
+      { estado: 'EN_REDACCION', count: 5 },
       { estado: 'EN_REVISION', count: 3 },
       { estado: 'ENVIADO', count: 12 },
       { estado: 'CERRADO', count: 16 }
@@ -46,7 +74,7 @@ export default function MetricasPage() {
       { mes: 'May', recibidos: 14, resueltos: 15 },
       { mes: 'Jun', recibidos: 16, resueltos: 14 }
     ]
-  };
+  });
 
   const exportarReporte = async (formato: 'pdf' | 'excel') => {
     setLoading(true);
@@ -54,12 +82,39 @@ export default function MetricasPage() {
       // Simular exportación
       await new Promise(resolve => setTimeout(resolve, 1000));
       console.log(`Exportando en formato ${formato}`);
+      
+      // En una implementación real, aquí llamarías a la API de exportación
+      const response = await fetch(`/api/reportes/exportar?formato=${formato}&rango=${rangoFecha}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reporte-metricas-${new Date().toISOString().split('T')[0]}.${formato}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
     } catch (error) {
       console.error('Error exportando reporte:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  if (loading && !metricas) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando métricas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const datos = metricas || getMetricasMock();
 
   return (
     <div className="space-y-6">
@@ -112,7 +167,7 @@ export default function MetricasPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Tiempo Promedio Respuesta</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {metricas.tiempoPromedioRespuesta} días
+                {datos.tiempoPromedioRespuesta} días
               </p>
               <p className="text-sm text-green-600 mt-1 flex items-center">
                 <TrendingUp size={14} className="mr-1" />
@@ -130,7 +185,7 @@ export default function MetricasPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Tasa de Cumplimiento</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {metricas.tasaCumplimiento}%
+                {datos.tasaCumplimiento}%
               </p>
               <p className="text-sm text-green-600 mt-1 flex items-center">
                 <TrendingUp size={14} className="mr-1" />
@@ -148,8 +203,8 @@ export default function MetricasPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Casos Activos</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {metricas.casosPorEstado.reduce((acc, curr) => 
-                  ['PENDIENTE', 'EN_REDACCIÓN', 'EN_REVISION'].includes(curr.estado) 
+                {datos.casosPorEstado.reduce((acc, curr) => 
+                  ['PENDIENTE', 'EN_REDACCION', 'EN_REVISION'].includes(curr.estado) 
                     ? acc + curr.count 
                     : acc, 0
                 )}
@@ -169,7 +224,7 @@ export default function MetricasPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Total Resueltos</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {metricas.casosPorEstado.reduce((acc, curr) => 
+                {datos.casosPorEstado.reduce((acc, curr) => 
                   ['ENVIADO', 'CERRADO'].includes(curr.estado) 
                     ? acc + curr.count 
                     : acc, 0
@@ -193,7 +248,7 @@ export default function MetricasPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Distribución por Estado</h2>
           <div className="space-y-3">
-            {metricas.casosPorEstado.map((item) => (
+            {datos.casosPorEstado.map((item) => (
               <div key={item.estado} className="flex items-center justify-between">
                 <span className="text-sm text-gray-600 capitalize">
                   {item.estado.replace(/_/g, ' ').toLowerCase()}
@@ -203,7 +258,7 @@ export default function MetricasPage() {
                     <div 
                       className="bg-blue-600 h-2 rounded-full" 
                       style={{ 
-                        width: `${(item.count / metricas.casosPorEstado.reduce((acc, curr) => acc + curr.count, 0)) * 100}%` 
+                        width: `${(item.count / datos.casosPorEstado.reduce((acc, curr) => acc + curr.count, 0)) * 100}%` 
                       }}
                     ></div>
                   </div>
@@ -220,7 +275,7 @@ export default function MetricasPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Casos por Entidad</h2>
           <div className="space-y-3">
-            {metricas.casosPorEntidad.map((item) => (
+            {datos.casosPorEntidad.map((item) => (
               <div key={item.entidad} className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">{item.entidad}</span>
                 <div className="flex items-center space-x-3">
@@ -228,7 +283,7 @@ export default function MetricasPage() {
                     <div 
                       className="bg-green-600 h-2 rounded-full" 
                       style={{ 
-                        width: `${(item.count / metricas.casosPorEntidad.reduce((acc, curr) => acc + curr.count, 0)) * 100}%` 
+                        width: `${(item.count / datos.casosPorEntidad.reduce((acc, curr) => acc + curr.count, 0)) * 100}%` 
                       }}
                     ></div>
                   </div>
@@ -266,7 +321,7 @@ export default function MetricasPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {metricas.casosPorResponsable.map((item, index) => (
+              {datos.casosPorResponsable.map((item, index) => (
                 <tr key={item.responsable} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {item.responsable}
@@ -290,6 +345,28 @@ export default function MetricasPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Tendencia mensual */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Tendencia Mensual</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          {datos.tendenciaMensual.map((item) => (
+            <div key={item.mes} className="text-center">
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="text-sm font-medium text-gray-600">{item.mes}</div>
+                <div className="mt-2">
+                  <div className="text-xs text-gray-500">Recibidos</div>
+                  <div className="text-lg font-bold text-blue-600">{item.recibidos}</div>
+                </div>
+                <div className="mt-1">
+                  <div className="text-xs text-gray-500">Resueltos</div>
+                  <div className="text-lg font-bold text-green-600">{item.resueltos}</div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

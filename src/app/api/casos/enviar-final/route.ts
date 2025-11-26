@@ -1,3 +1,5 @@
+//src/app/api/casos/enviar-final/route.ts
+
 import { NextResponse } from 'next/server';
 // Asegúrate de que esta importación use la ruta relativa correcta
 import { prisma } from '@/lib/prisma';  

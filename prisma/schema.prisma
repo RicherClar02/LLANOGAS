@@ -4,14 +4,14 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:12345Syb.@localhost:5432/llanogas?schema=public"
+  url      = "postgresql://postgres:Richer02@localhost:5432/llanogas?schema=public"
 }
 
 model User {
   id                   String       @id @default(uuid())
   email                String       @unique
   name                 String?
-  role                 UserRole     @default("GESTOR")
+  role                 UserRole     @default(GESTOR)
   password             String
   activo               Boolean      @default(true)
   cargo                String?
@@ -55,9 +55,9 @@ model Caso {
   id                    String          @id @default(uuid())
   asunto                String
   descripcion           String?
-  prioridad             Prioridad       @default("MEDIA")
-  estado                EstadoCaso      @default("PENDIENTE")
-  etapaAprobacion       EtapaAprobacion @default("RECIBIDO")
+  prioridad             Prioridad       @default(MEDIA)
+  estado                EstadoCaso      @default(PENDIENTE)
+  etapaAprobacion       EtapaAprobacion @default(RECIBIDO)
   tipoSolicitud         TipoSolicitud?
   numeroRadicadoEntrada String?
   numeroRadicadoSalida  String?
@@ -148,7 +148,7 @@ model Documento {
 
 model Revision {
   id              String         @id @default(uuid())
-  estado          EstadoRevision @default("PENDIENTE")
+  estado          EstadoRevision @default(PENDIENTE)
   comentario      String?
   casoId          String
   revisorId       String
@@ -162,7 +162,7 @@ model Revision {
 
 model Aprobacion {
   id              String           @id @default(uuid())
-  estado          EstadoAprobacion @default("PENDIENTE")
+  estado          EstadoAprobacion @default(PENDIENTE)
   comentario      String?
   casoId          String
   aprobadorId     String

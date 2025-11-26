@@ -1,6 +1,7 @@
+// src/app/dashboard/calendario/page.tsx
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Calendar, Filter, Clock, AlertTriangle, ChevronLeft, ChevronRight 
 } from 'lucide-react';
@@ -9,19 +10,19 @@ import {
   addMonths, subMonths, 
   addWeeks, subWeeks, 
   addDays, subDays,
-  startOfWeek, endOfWeek // Importadas para manejar la vista semanal
+  startOfWeek, endOfWeek,
+  startOfMonth,
+  endOfMonth
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-// Asegúrate de que estos componentes y utilidades existen en tus paths
-import { isDiaHabilColombiano } from '@/lib/colombia-utils';
 import CalendarGrid from '@/components/CalendarGrid';
 
 interface Evento {
   id: string;
   title: string;
   date: string;
-  type: 'vencimiento' | 'revision' | 'aprobacion';
+  type: 'vencimiento' | 'revision' | 'aprobacion' | 'festivo';
   casoId: string;
   entidad: string;
   prioridad: 'MUY_ALTA' | 'ALTA' | 'MEDIA' | 'BAJA';
@@ -30,13 +31,58 @@ interface Evento {
 export default function CalendarioPage() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
   const [vista, setVista] = useState<'mes' | 'semana' | 'dia'>('mes');
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Datos de eventos de prueba
-  const eventos: Evento[] = useMemo(() => [
+  // Cargar eventos desde la API
+  useEffect(() => {
+    const cargarEventos = async () => {
+      setLoading(true);
+      try {
+        let start: Date;
+        let end: Date;
+
+        if (vista === 'mes') {
+          start = startOfMonth(fechaSeleccionada);
+          end = endOfMonth(fechaSeleccionada);
+        } else if (vista === 'semana') {
+          start = startOfWeek(fechaSeleccionada, { locale: es });
+          end = endOfWeek(fechaSeleccionada, { locale: es });
+        } else {
+          start = fechaSeleccionada;
+          end = fechaSeleccionada;
+        }
+
+        const response = await fetch(
+          `/api/calendario/eventos?start=${start.toISOString()}&end=${end.toISOString()}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setEventos(data.eventos);
+        } else {
+          console.error('Error cargando eventos');
+          // Fallback con datos mock
+          setEventos(getEventosMock());
+        }
+      } catch (error) {
+        console.error('Error cargando eventos:', error);
+        // Fallback con datos mock
+        setEventos(getEventosMock());
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarEventos();
+  }, [fechaSeleccionada, vista]);
+
+  // Datos mock para fallback
+  const getEventosMock = (): Evento[] => [
     {
       id: '1',
       title: 'Vencimiento - Reporte SUI',
-      date: '2024-01-20',
+      date: new Date().toISOString().split('T')[0],
       type: 'vencimiento',
       casoId: 'SUI-2024-001',
       entidad: 'SUI',
@@ -45,13 +91,22 @@ export default function CalendarioPage() {
     {
       id: '2',
       title: 'Revisión Legal',
-      date: '2024-01-18',
+      date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       type: 'revision',
       casoId: 'SS-2024-015',
       entidad: 'Superservicios',
       prioridad: 'MUY_ALTA'
+    },
+    {
+      id: '3',
+      title: 'Aprobación Técnica',
+      date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      type: 'aprobacion',
+      casoId: 'MME-2024-008',
+      entidad: 'Ministerio de Minas',
+      prioridad: 'MEDIA'
     }
-  ], []);
+  ];
 
   // ******************************************************************
   // 1. Lógica de Navegación Dinámica (handlePrev y handleNext)
@@ -92,7 +147,6 @@ export default function CalendarioPage() {
   // ******************************************************************
 
   const tituloNavegacion = useMemo(() => {
-    // Nota: El locale: es asegura que la semana comience en Lunes (estándar europeo/latino)
     const options = { locale: es };
     
     switch (vista) {
@@ -101,16 +155,13 @@ export default function CalendarioPage() {
       case 'semana':
         const start = startOfWeek(fechaSeleccionada, options);
         const end = endOfWeek(fechaSeleccionada, options);
-        // Formato para Semana del Lunes X al Domingo Y
         return `Semana del ${format(start, 'd MMMM', options)} al ${format(end, 'd MMMM yyyy', options)}`;
       case 'dia':
-        // Formato para Miércoles, 18 de Noviembre 2025
         return format(fechaSeleccionada, 'EEEE, d MMMM yyyy', options);
       default:
         return format(fechaSeleccionada, 'MMMM yyyy', options);
     }
   }, [fechaSeleccionada, vista]);
-
 
   const getEventoStyles = (evento: Evento) => {
     const baseStyles = 'p-2 rounded-lg text-sm font-medium';
@@ -139,6 +190,17 @@ export default function CalendarioPage() {
     }
   };
 
+  if (loading && eventos.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando calendario...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -155,7 +217,6 @@ export default function CalendarioPage() {
           </button>
           
           <div className="flex bg-gray-100 rounded-lg p-1">
-            {/* Los botones de vista ya funcionan al llamar a setVista */}
             {(['mes', 'semana', 'dia'] as const).map((vistaItem) => (
               <button
                 key={vistaItem}
@@ -179,7 +240,10 @@ export default function CalendarioPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-700">Vencen esta semana</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">3</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {eventos.filter(e => e.type === 'vencimiento' && 
+                  new Date(e.date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)).length}
+              </p>
             </div>
             <div className="p-3 bg-red-100 rounded-lg">
               <AlertTriangle className="text-red-600" size={24} />
@@ -191,7 +255,9 @@ export default function CalendarioPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">En revisión</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">5</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {eventos.filter(e => e.type === 'revision').length}
+              </p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg">
               <Clock className="text-blue-600" size={24} />
@@ -202,8 +268,10 @@ export default function CalendarioPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Completados</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">12</p>
+              <p className="text-sm font-medium text-gray-600">Próximos eventos</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {eventos.filter(e => new Date(e.date) >= new Date()).length}
+              </p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
               <Calendar className="text-green-600" size={24} />
@@ -220,7 +288,11 @@ export default function CalendarioPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Próximos Eventos</h2>
             
             <div className="space-y-3">
-              {eventos.map((evento) => (
+              {eventos
+                .filter(evento => new Date(evento.date) >= new Date())
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .slice(0, 5)
+                .map((evento) => (
                 <div
                   key={evento.id}
                   className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
@@ -254,6 +326,9 @@ export default function CalendarioPage() {
                   </p>
                 </div>
               ))}
+              {eventos.filter(e => new Date(e.date) >= new Date()).length === 0 && (
+                <p className="text-gray-500 text-center py-4">No hay eventos próximos</p>
+              )}
             </div>
           </div>
         </div>
@@ -265,21 +340,17 @@ export default function CalendarioPage() {
             {/* Controles de Navegación y Vista */}
             <div className="flex justify-between items-center mb-4 flex-shrink-0">
               <div className="flex items-center space-x-2">
-                {/* Botón Anterior - usa handlePrev */}
                 <button onClick={handlePrev} className="p-2 border rounded-full hover:bg-gray-100">
                   <ChevronLeft size={16} className="text-indigo-600" />
                 </button>
-                {/* Título de Navegación Dinámico */}
                 <h2 className="text-xl font-semibold text-gray-900 capitalize">
                   {tituloNavegacion}
                 </h2>
-                {/* Botón Siguiente - usa handleNext */}
                 <button onClick={handleNext} className="p-2 border rounded-full hover:bg-gray-100">
                   <ChevronRight size={16} className="text-indigo-600" />
                 </button>
               </div>
 
-              {/* Botones de Vista (mes, semana, día) - Duplicado de la sección superior */}
               <div className="flex bg-gray-100 rounded-lg p-1">
                 {(['mes', 'semana', 'dia'] as const).map((vistaItem) => (
                   <button
@@ -299,12 +370,11 @@ export default function CalendarioPage() {
             
             {/* Área de Calendario */}
             <div className="flex-grow">
-                {/* Es crucial que CalendarGrid use 'fechaSeleccionada' y 'vista' para renderizar el grid correcto */}
-                <CalendarGrid 
-                    currentDate={fechaSeleccionada} 
-                    events={eventos} 
-                    view={vista} // Asegúrate de que CalendarGrid acepte esta prop
-                />
+              <CalendarGrid 
+                currentDate={fechaSeleccionada} 
+                events={eventos} 
+                view={vista}
+              />
             </div>
           </div>
         </div>

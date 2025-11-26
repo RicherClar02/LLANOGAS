@@ -24,7 +24,7 @@ export const getFestivosColombia = (year: number): Date[] => {
   festivos.push(new Date(year, 6, 20)); // Día de la Independencia (Julio 20)
   festivos.push(new Date(year, 7, 7)); // Batalla de Boyacá (Agosto 7)
   festivos.push(new Date(year, 11, 8)); // Inmaculada Concepción (Diciembre 8)
-  festivos.push(new Date(year, 11, 24)); // Navidad (Diciembre 24)
+  festivos.push(new Date(year, 11, 25)); // Navidad (Diciembre 25)
 
   // Ejemplo: Festivos Móviles (Revisar lista oficial para Ley Emiliani)
   if (year === 2024) {

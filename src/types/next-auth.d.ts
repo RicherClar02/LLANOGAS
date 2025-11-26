@@ -1,3 +1,4 @@
+//src/types/next-auth.d.ts
 import NextAuth, { DefaultSession, DefaultUser } from 'next-auth';
 import { JWT, DefaultJWT } from 'next-auth/jwt';
 import { UserRole } from '@prisma/client'; // <-- IMPORTANTE: Importar el enum

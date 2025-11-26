@@ -1,3 +1,4 @@
+// scripts/send_email.js
 const { google } = require('googleapis');
 const path = require('path');
 

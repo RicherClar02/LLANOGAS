@@ -1,5 +1,3 @@
-// src/app/api/casos/route.ts
-// API para gestión de casos - GET (listar) y POST (crear)
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
@@ -7,174 +5,162 @@ import { authOptions } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
-// GET - Listar todos los casos con filtros
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const estado = searchParams.get('estado');
-    const prioridad = searchParams.get('prioridad');
-    const entidad = searchParams.get('entidad');
-    const search = searchParams.get('search');
-
-    // Construir filtros
-    const where: any = {};
-
-    if (estado && estado !== 'todos') {
-      where.estado = estado;
-    }
-
-    if (prioridad && prioridad !== 'todos') {
-      where.prioridad = prioridad;
-    }
-
-    if (entidad && entidad !== 'todos') {
-      where.entidad = {
-        sigla: entidad
-      };
-    }
-
-    if (search) {
-      where.OR = [
-        { asunto: { contains: search, mode: 'insensitive' } },
-        { descripcion: { contains: search, mode: 'insensitive' } }
-      ];
-    }
-
-    // Obtener casos con relaciones
-    const casos = await prisma.caso.findMany({
-      where,
-      include: {
-        entidad: {
-          select: {
-            id: true,
-            nombre: true,
-            sigla: true,
-            color: true
-          }
-        },
-        responsable: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        actividades: {
-          include: {
-            usuario: {
-              select: {
-                name: true
-              }
-            }
-          },
-          orderBy: {
-            fecha: 'desc'
-          },
-          take: 5 // Últimas 5 actividades
-        },
-        _count: {
-          select: {
-            documentos: true,
-            actividades: true
-          }
-        }
-      },
-      orderBy: {
-        fechaRecepcion: 'desc'
-      }
-    });
-
-    return NextResponse.json({ casos });
-  } catch (error) {
-    console.error('Error al obtener casos:', error);
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    );
-  }
+// Función auxiliar para quitar acentos y convertir a MAYÚSCULAS
+function normalizePrismaEnum(str: string | null): string | null {
+    if (!str) return null;
+    // 1. Convertir a mayúsculas
+    const upperStr = str.toUpperCase();
+    // 2. Normalizar y remover diacríticos (acentos)
+    return upperStr.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// POST - Crear nuevo caso
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
+// GET - Listar casos para la bandeja con paginación y filtros
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = parseInt(searchParams.get('pageSize') || '10');
+    let estado = searchParams.get('estado'); 
+    const q = searchParams.get('q') || '';
+
+    const skip = (page - 1) * pageSize;
+
+    // La cláusula `where` final se construye aquí
+    const where: any = {};
+    // Un array para los bloques de filtros OR/AND que deben combinarse con el operador AND principal.
+    const andFilters: any[] = [];
+
+    // --- DEBUGGING: Muestra el valor de estado recibido ---
+    console.log('Filtro de Estado Recibido (Original):', estado);
     
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    // --- CORRECCIÓN ROBUSTA: Normaliza el estado eliminando acentos y forzando mayúsculas ---
+    // Esto asegura que 'EN_REDACCIÓN' -> 'EN_REDACCION' para que coincida con Prisma.
+    estado = normalizePrismaEnum(estado); 
+
+    // --- DEBUGGING: Muestra el valor de estado después de la normalización ---
+    console.log('Filtro de Estado Normalizado (Prisma):', estado);
+    // --------------------------------------------------------------------
+
+    // 1. Filtro por Estado (Se añade directamente al objeto where)
+    if (estado && estado !== 'TODOS') {
+      where.estado = estado;
+    }
+
+    // 2. Filtro de Búsqueda por Texto (Criterio OR)
+    if (q) {
+      andFilters.push({
+        // El bloque OR de búsqueda se añade a la matriz de filtros AND
+        OR: [
+          { asunto: { contains: q, mode: 'insensitive' } },
+          { descripcion: { contains: q, mode: 'insensitive' } },
+          { numeroRadicadoEntrada: { contains: q, mode: 'insensitive' } },
+          { entidad: { 
+              OR: [
+                { sigla: { contains: q, mode: 'insensitive' } },
+                { nombre: { contains: q, mode: 'insensitive' } }
+              ]
+            } 
+          },
+        ],
+      });
+    }
+
+    // 3. Filtro por Roles (Criterio OR)
+    // Si el usuario no es admin, filtramos por casos donde sea responsable o creador
+    if (session.user.role !== 'ADMINISTRADOR_SISTEMA' && session.user.role !== 'ADMINISTRADOR_ASIGNACIONES') {
+      // El bloque OR de roles se añade a la matriz de filtros AND
+      andFilters.push({
+        OR: [
+          { responsableId: session.user.id },
+          { creadorId: session.user.id }
+        ]
+      });
+    }
+    
+    // 4. Aplicar todos los bloques OR combinados usando el operador AND
+    if (andFilters.length > 0) {
+        where.AND = andFilters;
     }
 
-    const body = await request.json();
-    const { asunto, descripcion, prioridad, entidadId, fechaVencimiento } = body;
+    // Obtener casos con paginación
+    const [casos, totalCasos] = await Promise.all([
+      prisma.caso.findMany({
+        where, // Usamos la cláusula where correctamente construida
+        include: {
+          entidad: {
+            select: {
+              sigla: true,
+              nombre: true,
+              color: true
+            }
+          },
+          responsable: {
+            select: {
+              name: true,
+              email: true
+            }
+          },
+          creador: {
+            select: {
+              name: true,
+              email: true
+            }
+          },
+          email: {
+            select: {
+              from: true,
+              subject: true,
+              fecha: true
+            }
+          }
+        },
+        orderBy: {
+          fechaRecepcion: 'desc'
+        },
+        skip,
+        take: pageSize,
+      }),
+      prisma.caso.count({ where })
+    ]);
 
-    // Validaciones básicas
-    if (!asunto || !entidadId) {
-      return NextResponse.json(
-        { error: 'Asunto y entidad son requeridos' },
-        { status: 400 }
-      );
-    }
+    // Formatear la respuesta para la bandeja
+    const casosFormateados = casos.map(caso => ({
+      id: caso.id,
+      radicado: caso.numeroRadicadoEntrada || `C-${caso.id.slice(-8)}`,
+      entidadSigla: caso.entidad.sigla,
+      entidadNombre: caso.entidad.nombre,
+      asunto: caso.asunto,
+      estado: caso.estado,
+      fechaRecepcion: caso.fechaRecepcion,
+      fechaVencimiento: caso.fechaVencimiento,
+      responsable: caso.responsable?.name || caso.creador?.name || 'Sin asignar',
+      entidadColor: caso.entidad.color || '#6B7280',
+      // Información del email si existe
+      emailFrom: caso.email?.from,
+      emailSubject: caso.email?.subject
+    }));
 
-    // Crear el caso
-    const nuevoCaso = await prisma.caso.create({
-      data: {
-        asunto,
-        descripcion,
-        prioridad: prioridad || 'MEDIA',
-        estado: 'PENDIENTE',
-        etapaAprobacion: 'RECIBIDO',
-        tipoSolicitud: 'SOLICITUD_INFORMACION', // Valor por defecto
-        entidadId,
-        fechaVencimiento: fechaVencimiento ? new Date(fechaVencimiento) : null,
-        responsableId: session.user.id,
-        creadorId: session.user.id
-      },
-      include: {
-        entidad: {
-          select: {
-            id: true,
-            nombre: true,
-            sigla: true,
-            color: true
-          }
-        },
-        responsable: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    });
+    const totalPages = Math.ceil(totalCasos / pageSize);
 
-    // Crear actividad de creación
-    await prisma.actividad.create({
-      data: {
-        tipo: 'CREACION',
-        descripcion: 'Caso creado manualmente',
-        casoId: nuevoCaso.id,
-        usuarioId: session.user.id
-      }
-    });
+    return NextResponse.json({
+      casos: casosFormateados,
+      currentPage: page,
+      pageSize,
+      totalCasos,
+      totalPages,
+    });
 
-    return NextResponse.json(
-      { 
-        caso: nuevoCaso, 
-        message: 'Caso creado exitosamente' 
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error('Error al crear caso:', error);
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    );
-  }
+  } catch (error) {
+    console.error('Error obteniendo casos:', error);
+    return NextResponse.json(
+      { error: 'Error interno del servidor' },
+      { status: 500 }
+    );
+  }
 }
