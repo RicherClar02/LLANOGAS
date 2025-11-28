@@ -218,7 +218,7 @@ export default function BandejaPage() {
       </div>
 
       {/* Barra de Filtros y Búsqueda */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-gray-700">
         <form onSubmit={handleSearch}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Búsqueda */}
@@ -268,7 +268,7 @@ export default function BandejaPage() {
             <button
               type="button"
               onClick={handleLimpiarFiltros}
-              className="text-gray-600 hover:text-gray-800 font-medium"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
             >
               Limpiar filtros
             </button>

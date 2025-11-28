@@ -203,15 +203,31 @@ export default function DocumentosPage() {
         setDocumentos(prev => prev.filter(d => d.id !== documento.id));
         alert('Documento eliminado exitosamente');
       } else {
-        console.error('Error eliminando documento');
-        alert('Error al eliminar el documento');
+        // --- INICIO DE LA MEJORA ---
+        
+        // 1. Intentar leer el cuerpo del error como JSON
+        let errorMessage = 'Error desconocido al eliminar el documento.';
+        let errorData;
+        
+        try {
+            // Asumimos que el backend devuelve { error: 'Mensaje' }
+            errorData = await response.json(); 
+            errorMessage = errorData.error || `Error ${response.status}: ${errorMessage}`;
+        } catch (e) {
+            // Si no es JSON, usamos el estado de la respuesta
+            errorMessage = `Error ${response.status}. Por favor, revisa los logs del servidor.`; 
+        }
+
+        console.error('Error al eliminar documento:', response.status, errorData || errorMessage);
+        alert(`❌ Falló la eliminación: ${errorMessage}`);
+        // --- FIN DE LA MEJORA ---
       }
     } catch (error) {
-      console.error('Error eliminando documento:', error);
-      alert('Error al eliminar el documento');
+      // Este bloque maneja errores de red, no errores de API 4xx/5xx
+      console.error('Error de conexión/red:', error);
+      alert('Error de conexión con el servidor. Intente de nuevo.');
     }
-  };
-
+};
   const getTipoStyles = (tipo: string) => {
     switch (tipo) {
       case 'plantilla':
@@ -295,7 +311,7 @@ export default function DocumentosPage() {
       </div>
 
       {/* Barra de búsqueda y filtros */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-gray-700">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Búsqueda */}
           <div className="md:col-span-2">
@@ -364,7 +380,7 @@ export default function DocumentosPage() {
                     file: e.target.files?.[0] || null
                   })}
                   accept=".pdf,.docx,.xlsx,.pptx,.txt,.doc,.xls,.ppt"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
                 />
               </div>
 
@@ -378,7 +394,7 @@ export default function DocumentosPage() {
                     ...nuevoDocumento,
                     tipo: e.target.value
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
                 >
                   <option value="anexo">Anexo</option>
                   <option value="plantilla">Plantilla</option>
@@ -397,7 +413,7 @@ export default function DocumentosPage() {
                     ...nuevoDocumento,
                     casoId: e.target.value
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
                 >
                   <option value="">Seleccionar caso...</option>
                   {casos.map(caso => (
