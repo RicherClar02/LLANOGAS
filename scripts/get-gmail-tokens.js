@@ -1,3 +1,4 @@
+// scripts/get-gmail-tokens.js
 const { google } = require('googleapis');
 const path = require('path');
 

@@ -3,304 +3,396 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { Search, ChevronLeft, ChevronRight, Filter, AlertTriangle, Clock, Mail } from 'lucide-react';
+import { 
+  Search, 
+  ChevronLeft, 
+  ChevronRight, 
+  Filter, 
+  AlertTriangle, 
+  Clock, 
+  Mail, 
+  RefreshCw,
+  Eye,
+  FileText
+} from 'lucide-react';
 
-// Tipos basados en la respuesta de la API /api/casos
-interface Caso {
+interface Email {
   id: string;
-  radicado: string;
-  entidadSigla: string;
-  entidadNombre: string;
+  messageId: string;
   asunto: string;
-  estado: string;
-  fechaRecepcion: string;
-  fechaVencimiento: string | null;
-  responsable: string;
-  entidadColor: string;
-  emailFrom?: string;
-  emailSubject?: string;
+  remitente: string;
+  entidad: string;
+  prioridad: 'MUY_ALTA' | 'ALTA' | 'MEDIA' | 'BAJA';
+  radicado: string | null;
+  fecha: string;
+  tieneCaso: boolean;
+  caso: {
+    id: string;
+    estado: string;
+    responsable: string;
+    entidad: string;
+    fechaVencimiento: string | null;
+  } | null;
+  procesado: boolean;
+  clasificado: boolean;
 }
 
-interface CasosResponse {
-  casos: Caso[];
-  currentPage: number;
-  pageSize: number;
-  totalCasos: number;
-  totalPages: number;
+interface EmailsResponse {
+  emails: Email[];
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalEmails: number;
+    totalPages: number;
+  };
 }
 
-// Estados disponibles para el filtro
-const ESTADOS = [
-  { value: 'TODOS', label: 'Todos los Estados', icon: Clock, color: 'text-gray-600' },
-  { value: 'PENDIENTE', label: 'Pendiente', icon: Clock, color: 'text-yellow-600' },
-  { value: 'ASIGNADO', label: 'Asignado', icon: Clock, color: 'text-blue-600' },
-  { value: 'EN_REDACCION', label: 'En Redacción', icon: Clock, color: 'text-purple-600' },
-  { value: 'EN_REVISION', label: 'En Revisión', icon: AlertTriangle, color: 'text-orange-600' },
-  { value: 'EN_APROBACION', label: 'En Aprobación', icon: AlertTriangle, color: 'text-orange-600' },
-  { value: 'ENVIADO', label: 'Enviado', icon: Mail, color: 'text-green-600' },
-  { value: 'CERRADO', label: 'Cerrado', icon: Clock, color: 'text-green-600' },
-];
-
-// --- Utilidades de estilo ---
-const getStatusClasses = (estado: string) => {
-  switch (estado) {
-    case 'PENDIENTE': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    case 'ASIGNADO': return 'bg-blue-100 text-blue-800 border-blue-300';
-    case 'EN_REDACCION': return 'bg-purple-100 text-purple-800 border-purple-300';
-    case 'EN_REVISION': 
-    case 'EN_APROBACION': return 'bg-orange-100 text-orange-800 border-orange-300';
-    case 'ENVIADO': 
-    case 'CON_ACUSE': return 'bg-green-100 text-green-800 border-green-300';
-    case 'CERRADO': return 'bg-gray-100 text-gray-800 border-gray-300';
-    default: return 'bg-gray-100 text-gray-800 border-gray-300';
-  }
-}
-
-// --- Componente Principal de la Bandeja ---
 export default function BandejaPage() {
   const { data: session } = useSession();
-  const [casosData, setCasosData] = useState<CasosResponse | null>(null);
+  const [emailsData, setEmailsData] = useState<EmailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [procesando, setProcesando] = useState(false);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
-  const [estadoFilter, setEstadoFilter] = useState<string>('TODOS');
+  const [filtroEntidad, setFiltroEntidad] = useState('');
+  const [filtroRadicado, setFiltroRadicado] = useState<'todos' | 'con-radicado' | 'sin-radicado'>('todos');
   const pageSize = 10;
 
-  const fetchCasos = useCallback(async () => {
+  const fetchEmails = useCallback(async () => {
     if (!session) return;
     setLoading(true);
     try {
       const params = new URLSearchParams({ 
         page: page.toString(), 
-        pageSize: pageSize.toString(), 
-        estado: estadoFilter, 
-        q: searchQuery 
+        pageSize: pageSize.toString(),
+        search: searchQuery,
+        ...(filtroEntidad && { entidad: filtroEntidad }),
+        ...(filtroRadicado !== 'todos' && { 
+          conRadicado: filtroRadicado === 'con-radicado' ? 'true' : 'false' 
+        })
       });
       
-      const response = await fetch(`/api/casos?${params.toString()}`);
+      const response = await fetch(`/api/emails?${params.toString()}`);
       
       if (response.ok) {
-        const data: CasosResponse = await response.json();
-        setCasosData(data);
+        const data: EmailsResponse = await response.json();
+        setEmailsData(data);
       } else {
-        console.error('Error fetching casos:', response.statusText);
-        // CORRECCIÓN: Fallback vacío con sintaxis correcta
-        setCasosData({
-          casos: [],
-          currentPage: 1,
-          pageSize: pageSize,
-          totalCasos: 0,
-          totalPages: 0
+        console.error('Error fetching emails:', response.statusText);
+        setEmailsData({
+          emails: [],
+          pagination: {
+            currentPage: 1,
+            pageSize: pageSize,
+            totalEmails: 0,
+            totalPages: 0
+          }
         });
       }
     } catch (error) {
-      console.error('Error al obtener casos:', error);
-      // CORRECCIÓN: Fallback vacío con sintaxis correcta
-      setCasosData({
-        casos: [],
-        currentPage: 1,
-        pageSize: pageSize,
-        totalCasos: 0,
-        totalPages: 0
+      console.error('Error al obtener emails:', error);
+      setEmailsData({
+        emails: [],
+        pagination: {
+          currentPage: 1,
+          pageSize: pageSize,
+          totalEmails: 0,
+          totalPages: 0
+        }
       });
     } finally {
       setLoading(false);
     }
-  }, [page, estadoFilter, searchQuery, session, pageSize]);
+  }, [page, searchQuery, filtroEntidad, filtroRadicado, session, pageSize]);
+
+  // Procesar nuevos emails
+  const procesarNuevosEmails = async () => {
+    setProcesando(true);
+    try {
+      const response = await fetch('/api/email/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'check' }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`✅ ${result.message}`);
+        // Recargar la lista
+        fetchEmails();
+      } else {
+        throw new Error('Error procesando emails');
+      }
+    } catch (error) {
+      console.error('Error procesando emails:', error);
+      alert('❌ Error al procesar emails');
+    } finally {
+      setProcesando(false);
+    }
+  };
 
   // Ejecutar la carga al cambiar filtros o página
   useEffect(() => {
-    fetchCasos();
-  }, [fetchCasos]);
+    fetchEmails();
+  }, [fetchEmails]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1); // Resetear a la primera página al buscar
-    fetchCasos();
+    setPage(1);
+    fetchEmails();
   };
 
   const handlePageChange = (newPage: number) => {
-    if (casosData && newPage >= 1 && newPage <= casosData.totalPages) {
+    if (emailsData && newPage >= 1 && newPage <= emailsData.pagination.totalPages) {
       setPage(newPage);
     }
   };
 
-  // Determinar si la fecha de vencimiento está cerca o pasada
-  const getVencimientoStatus = (vencimiento: string | null) => {
-    if (!vencimiento) return 'text-gray-500';
+  const handleLimpiarFiltros = () => {
+    setSearchQuery('');
+    setFiltroEntidad('');
+    setFiltroRadicado('todos');
+    setPage(1);
+  };
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); 
-    const vencimientoDate = new Date(vencimiento);
-    vencimientoDate.setHours(0, 0, 0, 0);
+  // Clases para prioridades
+  const getPriorityClasses = (prioridad: string) => {
+    switch (prioridad) {
+      case 'MUY_ALTA': return 'bg-red-100 text-red-800 border-red-300';
+      case 'ALTA': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'MEDIA': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'BAJA': return 'bg-green-100 text-green-800 border-green-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
 
-    const diffTime = vencimientoDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return 'text-red-600 font-semibold'; // Vencido
-    if (diffDays <= 3) return 'text-orange-600 font-semibold'; // Cerca de vencer (3 días o menos)
-    return 'text-green-600'; // Bien
+  // Clases para estados
+  const getStatusClasses = (estado: string) => {
+    switch (estado) {
+      case 'PENDIENTE': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'EN_REDACCION': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'EN_REVISION': return 'bg-purple-100 text-purple-800 border-purple-300';
+      case 'ENVIADO': return 'bg-green-100 text-green-800 border-green-300';
+      case 'CERRADO': return 'bg-gray-100 text-gray-800 border-gray-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
   };
 
   // Formatear fecha
-  const formatFecha = (fecha: string | null) => {
-    if (!fecha) return 'N/A';
-    return new Date(fecha).toLocaleDateString('es-ES');
+  const formatFecha = (fecha: string) => {
+    return new Date(fecha).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  // CORRECCIÓN: Función para manejar el cambio de filtro de estado
-  const handleEstadoFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setEstadoFilter(e.target.value);
-    setPage(1);
-  };
+  // Entidades únicas para el filtro
+  const entidadesUnicas = [...new Set(emailsData?.emails.map(e => e.entidad).filter(Boolean))];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bandeja de Casos</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Bandeja de Correos</h1>
           <p className="text-gray-600">
-            {casosData?.totalCasos || 0} {casosData?.totalCasos === 1 ? 'caso' : 'casos'} encontrados
+            {emailsData?.pagination.totalEmails || 0} {emailsData?.pagination.totalEmails === 1 ? 'correo' : 'correos'} procesados
           </p>
+        </div>
+
+        <div className="flex space-x-3">
+          <button
+            onClick={procesarNuevosEmails}
+            disabled={procesando}
+            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw size={16} className={procesando ? 'animate-spin' : ''} />
+            <span>{procesando ? 'Procesando...' : 'Buscar Nuevos Correos'}</span>
+          </button>
         </div>
       </div>
 
-      {/* --- Barra de Filtros y Búsqueda --- */}
+      {/* Barra de Filtros y Búsqueda */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Búsqueda */}
-          <div className="md:col-span-2">
-            <form onSubmit={handleSearch}>
+        <form onSubmit={handleSearch}>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Búsqueda */}
+            <div className="md:col-span-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <input
                   type="text"
-                  placeholder="Buscar por radicado, asunto o entidad..."
+                  placeholder="Buscar por asunto, remitente, radicado..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-            </form>
-          </div>
+            </div>
 
-          {/* Filtro por Estado */}
-          <div>
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            {/* Filtro por Entidad */}
+            <div>
               <select
-                value={estadoFilter}
-                onChange={handleEstadoFilterChange}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+                value={filtroEntidad}
+                onChange={(e) => setFiltroEntidad(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                {ESTADOS.map(estado => (
-                  <option key={estado.value} value={estado.value}>
-                    {estado.label}
-                  </option>
+                <option value="">Todas las entidades</option>
+                {entidadesUnicas.map(entidad => (
+                  <option key={entidad} value={entidad}>{entidad}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Filtro por Radicado */}
+            <div>
+              <select
+                value={filtroRadicado}
+                onChange={(e) => setFiltroRadicado(e.target.value as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="todos">Todos los correos</option>
+                <option value="con-radicado">Con radicado</option>
+                <option value="sin-radicado">Sin radicado</option>
               </select>
             </div>
           </div>
 
-          {/* Botón Limpiar */}
-          <div>
-            <button 
-              onClick={() => { setEstadoFilter('TODOS'); setSearchQuery(''); setPage(1); }}
-              className="w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          {/* Botones de acción */}
+          <div className="flex justify-between items-center mt-4">
+            <button
+              type="button"
+              onClick={handleLimpiarFiltros}
+              className="text-gray-600 hover:text-gray-800 font-medium"
             >
-              Limpiar Filtros
+              Limpiar filtros
+            </button>
+            
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Buscar
             </button>
           </div>
-        </div>
+        </form>
       </div>
 
-      {/* --- Tabla de Casos --- */}
+      {/* Tabla de Correos */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Radicado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entidad</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asunto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsable</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimiento</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Radicado
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Entidad
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Asunto
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Remitente
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Fecha
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Prioridad
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Estado
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-gray-500">
+                  <td colSpan={8} className="text-center py-10 text-gray-500">
                     <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                    Cargando casos...
+                    Cargando correos...
                   </td>
                 </tr>
-              ) : casosData?.casos.length === 0 ? (
+              ) : emailsData?.emails.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-gray-500">
-                    {searchQuery || estadoFilter !== 'TODOS' 
-                      ? 'No se encontraron casos que coincidan con los filtros.'
-                      : 'No hay casos registrados en el sistema.'
+                  <td colSpan={8} className="text-center py-10 text-gray-500">
+                    {searchQuery || filtroEntidad || filtroRadicado !== 'todos' 
+                      ? 'No se encontraron correos que coincidan con los filtros.'
+                      : 'No hay correos procesados. Haz clic en "Buscar Nuevos Correos".'
                     }
                   </td>
                 </tr>
               ) : (
-                casosData?.casos.map((caso) => (
-                  <tr key={caso.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <Link 
-                        href={`/dashboard/bandeja/${caso.id}`}
-                        className="hover:text-blue-600 transition-colors"
-                      >
-                        {caso.radicado}
-                      </Link>
-                      {caso.emailFrom && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          <Mail className="inline w-3 h-3 mr-1" />
-                          De: {caso.emailFrom}
-                        </div>
+                emailsData?.emails.map((email) => (
+                  <tr key={email.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      {email.radicado ? (
+                        <span className="text-blue-600 font-mono">{email.radicado}</span>
+                      ) : (
+                        <span className="text-gray-400">Sin radicado</span>
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {email.entidad || 'No detectada'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                      <div className="line-clamp-2">{email.asunto}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center space-x-2">
-                        <span 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: caso.entidadColor }}
-                        ></span>
-                        <span className="font-medium">{caso.entidadSigla}</span>
+                        <Mail size={14} className="text-gray-400" />
+                        <span className="truncate max-w-[150px]">{email.remitente}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
-                      <div className="line-clamp-2">{caso.asunto}</div>
-                      {caso.emailSubject && caso.emailSubject !== caso.asunto && (
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-1">
-                          Email: {caso.emailSubject}
-                        </div>
-                      )}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {caso.responsable}
+                      {formatFecha(email.fecha)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={getVencimientoStatus(caso.fechaVencimiento)}>
-                        {formatFecha(caso.fechaVencimiento)}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getPriorityClasses(email.prioridad)}`}>
+                        {email.prioridad.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusClasses(caso.estado)}`}>
-                        {caso.estado.replace(/_/g, ' ')}
-                      </span>
+                      {email.tieneCaso ? (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusClasses(email.caso!.estado)}`}>
+                          {email.caso!.estado.replace(/_/g, ' ')}
+                        </span>
+                      ) : (
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full border bg-gray-100 text-gray-800 border-gray-300">
+                          Sin caso
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Link 
-                        href={`/dashboard/bandeja/${caso.id}`}
-                        className="text-blue-600 hover:text-blue-900 transition-colors"
-                      >
-                        Ver detalles
-                      </Link>
+                      <div className="flex space-x-2">
+                        {email.tieneCaso ? (
+                          <Link 
+                            href={`/dashboard/bandeja/${email.caso!.id}`}
+                            className="text-blue-600 hover:text-blue-900 transition-colors flex items-center space-x-1"
+                          >
+                            <FileText size={14} />
+                            <span>Ver caso</span>
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => alert('Funcionalidad para crear caso desde este email')}
+                            className="text-green-600 hover:text-green-900 transition-colors flex items-center space-x-1"
+                          >
+                            <Eye size={14} />
+                            <span>Crear caso</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -310,20 +402,20 @@ export default function BandejaPage() {
         </div>
       </div>
 
-      {/* --- Paginación --- */}
-      {casosData && casosData.totalPages > 1 && (
+      {/* Paginación */}
+      {emailsData && emailsData.pagination.totalPages > 1 && (
         <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
           <p className="text-sm text-gray-700">
-            Mostrando <span className="font-medium">{(casosData.currentPage - 1) * pageSize + 1}</span> a{' '}
-            <span className="font-medium">{Math.min(casosData.currentPage * pageSize, casosData.totalCasos)}</span> de{' '}
-            <span className="font-medium">{casosData.totalCasos}</span> resultados
+            Mostrando <span className="font-medium">{(emailsData.pagination.currentPage - 1) * pageSize + 1}</span> a{' '}
+            <span className="font-medium">{Math.min(emailsData.pagination.currentPage * pageSize, emailsData.pagination.totalEmails)}</span> de{' '}
+            <span className="font-medium">{emailsData.pagination.totalEmails}</span> resultados
           </p>
           <nav className="flex items-center space-x-2">
             <button
-              onClick={() => handlePageChange(casosData.currentPage - 1)}
-              disabled={casosData.currentPage === 1}
+              onClick={() => handlePageChange(emailsData.pagination.currentPage - 1)}
+              disabled={emailsData.pagination.currentPage === 1}
               className={`p-2 border border-gray-300 rounded-lg ${
-                casosData.currentPage === 1 
+                emailsData.pagination.currentPage === 1 
                   ? 'text-gray-400 cursor-not-allowed' 
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
@@ -332,14 +424,14 @@ export default function BandejaPage() {
             </button>
             
             <span className="px-3 py-1 text-sm text-gray-700 bg-gray-100 rounded-lg">
-              Página {casosData.currentPage} de {casosData.totalPages}
+              Página {emailsData.pagination.currentPage} de {emailsData.pagination.totalPages}
             </span>
 
             <button
-              onClick={() => handlePageChange(casosData.currentPage + 1)}
-              disabled={casosData.currentPage === casosData.totalPages}
+              onClick={() => handlePageChange(emailsData.pagination.currentPage + 1)}
+              disabled={emailsData.pagination.currentPage === emailsData.pagination.totalPages}
               className={`p-2 border border-gray-300 rounded-lg ${
-                casosData.currentPage === casosData.totalPages 
+                emailsData.pagination.currentPage === emailsData.pagination.totalPages 
                   ? 'text-gray-400 cursor-not-allowed' 
                   : 'text-gray-600 hover:bg-gray-50'
               }`}

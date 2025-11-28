@@ -109,6 +109,13 @@ model Email {
   createdAt          DateTime   @default(now())
   caso               Caso?
 
+  // NUEVOS CAMPOS PARA FILTRADO
+  numeroRadicado     String?    // Extraído del asunto/cuerpo
+  remitenteOriginal  String?    // Nombre del remitente
+  dominioRemitente   String?    // Dominio para detectar entidad
+  palabrasClave      String[]   // Para búsqueda
+  esEntidadControl   Boolean    @default(false)
+  
   @@map("emails")
 }
 
