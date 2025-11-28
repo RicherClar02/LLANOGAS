@@ -72,7 +72,7 @@ export default function BandejaPage() {
         })
       });
       
-      const response = await fetch(`/api/emails?${params.toString()}`);
+      const response = await fetch(`/api/email?${params.toString()}`);
       
       if (response.ok) {
         const data: EmailsResponse = await response.json();

@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TipoSolicitud" ADD VALUE 'CONSULTA_GENERAL';

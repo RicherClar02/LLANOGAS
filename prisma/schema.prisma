@@ -1,10 +1,11 @@
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:Richer02@localhost:5432/llanogas?schema=public"
+  url      = "postgresql://postgres:12345Syb.@localhost:5432/llanogas?schema=public"
 }
 
 model User {
@@ -231,6 +232,7 @@ enum TipoSolicitud {
   REQUERIMIENTO_JUDICIAL
   SOLICITUD_VIABILIDAD
   CONSULTA_JURIDICA
+  CONSULTA_GENERAL
   REPORTE_OBLIGATORIO
   OTRO
 }
