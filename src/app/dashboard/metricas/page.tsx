@@ -76,33 +76,57 @@ export default function MetricasPage() {
     ]
   });
 
-  const exportarReporte = async (formato: 'pdf' | 'excel') => {
+const exportarReporte = async (formato: 'pdf' | 'excel') => {
     setLoading(true);
     try {
-      // Simular exportación
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log(`Exportando en formato ${formato}`);
-      
-      // En una implementación real, aquí llamarías a la API de exportación
-      const response = await fetch(`/api/reportes/exportar?formato=${formato}&rango=${rangoFecha}`);
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `reporte-metricas-${new Date().toISOString().split('T')[0]}.${formato}`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
-    } catch (error) {
-      console.error('Error exportando reporte:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const response = await fetch(`/api/reportes/exportar?formato=${formato}&rango=${rangoFecha}`);
+        
+        if (response.ok) {
+            // ✅ CASO EXITOSO (200 OK): Lógica de descarga
+            const blob = await response.blob();
+            
+            // 💡 Paso 1: Crear una URL de objeto temporal para el Blob
+            const url = window.URL.createObjectURL(blob);
+            
+            // 💡 Paso 2: Crear un elemento <a> oculto
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // 💡 Paso 3: Asignar el nombre del archivo (IMPORTANTE: usar 'xlsx' para Excel)
+            const extension = formato === 'excel' ? 'xlsx' : formato;
+            a.download = `reporte-metricas-${new Date().toISOString().split('T')[0]}.${extension}`;
+            
+            // 💡 Paso 4: Adjuntar, hacer clic, y limpiar el DOM
+            document.body.appendChild(a); 
+            a.click(); // 👈 Esto inicia la descarga
+            
+            window.URL.revokeObjectURL(url); // Liberar la URL de objeto
+            document.body.removeChild(a);  // Remover el elemento a
+            
+            alert(`Reporte exportado como ${extension.toUpperCase()}.`);
 
+        } else {
+            // ❌ MANEJO DE ERROR CRÍTICO (401, 404, 500)
+            let errorMessage = `Error ${response.status} al exportar.`;
+
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+            } catch (e) {
+                // No es JSON, puede ser un error de red
+            }
+
+            console.error(`Error de la API de exportación: ${errorMessage}`);
+            alert(`Fallo en la exportación: ${errorMessage}`);
+        }
+        
+    } catch (error) {
+        console.error('Error de red/conexión:', error);
+        alert('Error al conectar con el servidor.');
+    } finally {
+        setLoading(false);
+    }
+};
   if (loading && !metricas) {
     return (
       <div className="flex items-center justify-center h-64">
