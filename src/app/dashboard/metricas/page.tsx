@@ -106,7 +106,7 @@ const exportarReporte = async (formato: 'pdf' | 'excel') => {
             alert(`Reporte exportado como ${extension.toUpperCase()}.`);
 
         } else {
-            // ❌ MANEJO DE ERROR CRÍTICO (401, 404, 500)
+            // MANEJO DE ERROR CRÍTICO (401, 404, 500)
             let errorMessage = `Error ${response.status} al exportar.`;
 
             try {
