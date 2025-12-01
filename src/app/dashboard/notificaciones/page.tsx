@@ -1,5 +1,6 @@
-//src/app/dashboard/notificaciones/page.tsx
+
 'use client';
+
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
@@ -13,19 +14,51 @@ interface Notification {
   timestamp: Date;
   read: boolean;
   casoId?: string;
+  userId?: string;
 }
 
 export default function NotificacionesPage() {
   const { data: session } = useSession();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<'todos' | 'no-leidos'>('todos');
   const [busqueda, setBusqueda] = useState('');
 
+  // Cargar notificaciones reales desde la API
   useEffect(() => {
     const cargarNotificaciones = async () => {
+      if (!session) return;
+      
       try {
-        // Simular carga de notificaciones
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch('/api/notifications');
+        
+        if (!response.ok) {
+          throw new Error('Error al cargar notificaciones');
+        }
+        
+        const data = await response.json();
+        console.log('Notificaciones cargadas:', data.notifications);
+        
+        if (data.success && data.notifications) {
+          // Convertir timestamp string a Date
+          const notificacionesConFecha = data.notifications.map((notif: any) => ({
+            ...notif,
+            timestamp: new Date(notif.timestamp)
+          }));
+          
+          setNotifications(notificacionesConFecha);
+        } else {
+          throw new Error('Estructura de respuesta inválida');
+        }
+      } catch (error) {
+        console.error('Error cargando notificaciones:', error);
+        setError('No se pudieron cargar las notificaciones');
+        
+        // Fallback a datos mock si la API falla
         const mockNotifications: Notification[] = [
           {
             id: '1',
@@ -66,24 +99,55 @@ export default function NotificacionesPage() {
         ];
         
         setNotifications(mockNotifications);
-      } catch (error) {
-        console.error('Error cargando notificaciones:', error);
       } finally {
         setLoading(false);
       }
     };
 
     cargarNotificaciones();
-  }, []);
+  }, [session]);
 
-  const marcarComoLeida = (id: string) => {
-    setNotifications(notifications.map(notif => 
-      notif.id === id ? { ...notif, read: true } : notif
-    ));
+  const marcarComoLeida = async (id: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${id}/read`, {
+        method: 'PUT'
+      });
+
+      if (response.ok) {
+        // Actualizar estado local
+        setNotifications(notifications.map(notif => 
+          notif.id === id ? { ...notif, read: true } : notif
+        ));
+      } else {
+        console.error('Error marcando notificación como leída');
+      }
+    } catch (error) {
+      console.error('Error marcando notificación como leída:', error);
+      // Fallback: actualizar estado local aunque falle la API
+      setNotifications(notifications.map(notif => 
+        notif.id === id ? { ...notif, read: true } : notif
+      ));
+    }
   };
 
-  const marcarTodasComoLeidas = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, read: true })));
+  const marcarTodasComoLeidas = async () => {
+    try {
+      // Marcar cada notificación no leída
+      const promesas = notifications
+        .filter(notif => !notif.read)
+        .map(notif => 
+          fetch(`/api/notifications/${notif.id}/read`, { method: 'PUT' })
+        );
+
+      await Promise.all(promesas);
+      
+      // Actualizar estado local
+      setNotifications(notifications.map(notif => ({ ...notif, read: true })));
+    } catch (error) {
+      console.error('Error marcando todas como leídas:', error);
+      // Fallback: actualizar estado local
+      setNotifications(notifications.map(notif => ({ ...notif, read: true })));
+    }
   };
 
   const getNotificationIcon = (type: Notification['type']) => {
@@ -164,6 +228,16 @@ export default function NotificacionesPage() {
         </div>
       </div>
 
+      {/* Mostrar error si existe */}
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertTriangle className="text-yellow-500 mr-2" size={20} />
+            <p className="text-yellow-800">{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Filtros y búsqueda */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -175,7 +249,7 @@ export default function NotificacionesPage() {
               placeholder="Buscar en notificaciones..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
             />
           </div>
 
@@ -184,7 +258,7 @@ export default function NotificacionesPage() {
             <select
               value={filtro}
               onChange={(e) => setFiltro(e.target.value as 'todos' | 'no-leidos')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
             >
               <option value="todos">Todas las notificaciones</option>
               <option value="no-leidos">Solo no leídas</option>
@@ -264,7 +338,9 @@ export default function NotificacionesPage() {
                           notification.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
                           'bg-blue-100 text-blue-800'
                         }`}>
-                          {notification.type}
+                          {notification.type === 'success' ? 'Éxito' : 
+                           notification.type === 'error' ? 'Error' : 
+                           notification.type === 'warning' ? 'Advertencia' : 'Información'}
                         </span>
                       </div>
                     </div>

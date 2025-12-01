@@ -1,33 +1,33 @@
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:12345Syb.@localhost:5432/llanogas?schema=public"
+  url      = "postgresql://postgres:Richer02@localhost:5432/llanogas?schema=public"
 }
 
 model User {
-  id                   String       @id @default(uuid())
-  email                String       @unique
+  id                   String          @id @default(uuid())
+  email                String          @unique
   name                 String?
-  role                 UserRole     @default(GESTOR)
+  role                 UserRole        @default(GESTOR)
   password             String
-  activo               Boolean      @default(true)
+  activo               Boolean         @default(true)
   cargo                String?
   proceso              String?
   idColaborador        String?
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
   fechaInactivacion    DateTime?
   actividades          Actividad[]
   aprobaciones         Aprobacion[]
-  casosCreados         Caso[]       @relation("CasosCreados")
-  casosAsignados       Caso[]       @relation("CasosAsignados")
+  casosCreados         Caso[]          @relation("CasosCreados")
+  casosAsignados       Caso[]          @relation("CasosAsignados")
   documentos           Documento[]
-  entidadesResponsable Entidad[]    @relation("ResponsableEntidad")
+  entidadesResponsable Entidad[]       @relation("ResponsableEntidad")
   revisiones           Revision[]
+  notificaciones       Notification[]  // RELACIÓN AGREGADA
 
   @@map("users")
 }
@@ -89,6 +89,7 @@ model Caso {
   email                 Email?          @relation(fields: [emailId], references: [id])
   documentos            Documento[]
   revisiones            Revision[]
+  notificaciones        Notification[]  // RELACIÓN AGREGADA
 
   @@map("casos")
 }
@@ -180,6 +181,23 @@ model Aprobacion {
   caso            Caso             @relation(fields: [casoId], references: [id])
 
   @@map("aprobaciones")
+}
+
+
+model Notification {
+  id          String   @id @default(uuid())
+  type        String   // 'success', 'error', 'warning', 'info'
+  title       String
+  message     String
+  read        Boolean  @default(false)
+  userId      String
+  casoId      String?
+  timestamp   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id])
+  caso        Caso?    @relation(fields: [casoId], references: [id])
+
+  @@map("notifications")
 }
 
 enum UserRole {

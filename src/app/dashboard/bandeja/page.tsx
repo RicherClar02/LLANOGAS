@@ -45,6 +45,17 @@ interface EmailsResponse {
     totalEmails: number;
     totalPages: number;
   };
+  filtros?: {
+    entidades: Array<{ nombre: string; count: number }>;
+    dominios: Array<{ nombre: string; count: number }>;
+    prioridades: Array<{ nombre: string; count: number }>;
+  };
+  summary?: {
+    totalProcesados: number;
+    conRadicado: number;
+    sinRadicado: number;
+    conCaso: number;
+  };
 }
 
 export default function BandejaPage() {
@@ -52,6 +63,7 @@ export default function BandejaPage() {
   const [emailsData, setEmailsData] = useState<EmailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [procesando, setProcesando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [filtroEntidad, setFiltroEntidad] = useState('');
@@ -61,6 +73,7 @@ export default function BandejaPage() {
   const fetchEmails = useCallback(async () => {
     if (!session) return;
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams({ 
         page: page.toString(), 
@@ -75,10 +88,30 @@ export default function BandejaPage() {
       const response = await fetch(`/api/email?${params.toString()}`);
       
       if (response.ok) {
-        const data: EmailsResponse = await response.json();
-        setEmailsData(data);
+        const data = await response.json();
+        
+        // Verificar si la respuesta tiene la estructura esperada
+        if (data.success && data.data) {
+          setEmailsData(data.data);
+        } else if (data.emails) {
+          // Estructura antigua de la API
+          setEmailsData(data);
+        } else {
+          // Estructura inesperada
+          console.error('Estructura de respuesta inesperada:', data);
+          setEmailsData({
+            emails: [],
+            pagination: {
+              currentPage: 1,
+              pageSize: pageSize,
+              totalEmails: 0,
+              totalPages: 0
+            }
+          });
+        }
       } else {
         console.error('Error fetching emails:', response.statusText);
+        setError('Error al cargar los correos. Por favor, intenta nuevamente.');
         setEmailsData({
           emails: [],
           pagination: {
@@ -91,6 +124,7 @@ export default function BandejaPage() {
       }
     } catch (error) {
       console.error('Error al obtener emails:', error);
+      setError('Error al cargar los correos. Por favor, intenta nuevamente.');
       setEmailsData({
         emails: [],
         pagination: {
@@ -191,8 +225,10 @@ export default function BandejaPage() {
     });
   };
 
-  // Entidades únicas para el filtro
-  const entidadesUnicas = [...new Set(emailsData?.emails.map(e => e.entidad).filter(Boolean))];
+  // Entidades únicas para el filtro - CORREGIDO
+  const entidadesUnicas = emailsData?.emails 
+    ? [...new Set(emailsData.emails.map(e => e.entidad).filter(Boolean))]
+    : [];
 
   return (
     <div className="space-y-6">
@@ -217,8 +253,18 @@ export default function BandejaPage() {
         </div>
       </div>
 
+      {/* Mostrar error si existe */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertTriangle className="text-red-400 mr-2" size={20} />
+            <p className="text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Barra de Filtros y Búsqueda */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-gray-700">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <form onSubmit={handleSearch}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Búsqueda */}
@@ -230,7 +276,7 @@ export default function BandejaPage() {
                   placeholder="Buscar por asunto, remitente, radicado..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 />
               </div>
             </div>
@@ -240,7 +286,7 @@ export default function BandejaPage() {
               <select
                 value={filtroEntidad}
                 onChange={(e) => setFiltroEntidad(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
               >
                 <option value="">Todas las entidades</option>
                 {entidadesUnicas.map(entidad => (
@@ -254,7 +300,7 @@ export default function BandejaPage() {
               <select
                 value={filtroRadicado}
                 onChange={(e) => setFiltroRadicado(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
               >
                 <option value="todos">Todos los correos</option>
                 <option value="con-radicado">Con radicado</option>
@@ -268,7 +314,7 @@ export default function BandejaPage() {
             <button
               type="button"
               onClick={handleLimpiarFiltros}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
             >
               Limpiar filtros
             </button>
@@ -416,8 +462,8 @@ export default function BandejaPage() {
               disabled={emailsData.pagination.currentPage === 1}
               className={`p-2 border border-gray-300 rounded-lg ${
                 emailsData.pagination.currentPage === 1 
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-gray-600 hover:bg-gray-50'
+                  ? 'text-gray-400 cursor-not-allowed bg-gray-100' 
+                  : 'text-gray-600 hover:bg-gray-50 bg-white'
               }`}
             >
               <ChevronLeft size={16} />
@@ -432,8 +478,8 @@ export default function BandejaPage() {
               disabled={emailsData.pagination.currentPage === emailsData.pagination.totalPages}
               className={`p-2 border border-gray-300 rounded-lg ${
                 emailsData.pagination.currentPage === emailsData.pagination.totalPages 
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-gray-600 hover:bg-gray-50'
+                  ? 'text-gray-400 cursor-not-allowed bg-gray-100' 
+                  : 'text-gray-600 hover:bg-gray-50 bg-white'
               }`}
             >
               <ChevronRight size={16} />

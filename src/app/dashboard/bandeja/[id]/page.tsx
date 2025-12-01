@@ -33,7 +33,7 @@ interface CasoDetalle {
     nombre: string;
     sigla: string;
     color: string | null;
-  };
+  } | null;
   responsable: {
     name: string | null;
     email: string;
@@ -96,11 +96,23 @@ export default function DetalleCasoPage() {
         const data = await response.json();
         console.log('Datos recibidos:', data);
         
-        setCaso(data);
-        setFormData({
-          descripcion: data.descripcion || '',
-          prioridad: data.prioridad
-        });
+        // Verificar si la respuesta tiene la estructura correcta
+        if (data.success && data.data) {
+          setCaso(data.data);
+          setFormData({
+            descripcion: data.data.descripcion || '',
+            prioridad: data.data.prioridad
+          });
+        } else if (data.id) {
+          // Estructura antigua
+          setCaso(data);
+          setFormData({
+            descripcion: data.descripcion || '',
+            prioridad: data.prioridad
+          });
+        } else {
+          throw new Error('Estructura de datos inválida');
+        }
       } catch (error) {
         console.error('Error cargando caso:', error);
         setError(error instanceof Error ? error.message : 'Error desconocido');
@@ -235,10 +247,10 @@ export default function DetalleCasoPage() {
                   <div className="flex items-center space-x-2">
                     <div 
                       className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: caso.entidad.color || '#6B7280' }}
+                      style={{ backgroundColor: caso.entidad?.color || '#6B7280' }}
                     ></div>
                     <span className="text-gray-900">
-                      {caso.entidad.nombre} ({caso.entidad.sigla})
+                      {caso.entidad ? `${caso.entidad.nombre} (${caso.entidad.sigla})` : 'Entidad no asignada'}
                     </span>
                   </div>
                 </div>
@@ -249,7 +261,7 @@ export default function DetalleCasoPage() {
                     <select
                       value={formData.prioridad}
                       onChange={(e) => setFormData({...formData, prioridad: e.target.value as any})}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900"
                     >
                       <option value="MUY_ALTA">Muy Alta</option>
                       <option value="ALTA">Alta</option>
@@ -281,7 +293,7 @@ export default function DetalleCasoPage() {
                     value={formData.descripcion}
                     onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
                     rows={6}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                     placeholder="Describe el caso..."
                   />
                   <div className="flex justify-end">
@@ -375,7 +387,7 @@ export default function DetalleCasoPage() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Recepción:</span>
-                  <span className="text-sm font-medium">
+                  <span className="text-sm font-medium text-gray-900">
                     {new Date(caso.fechaRecepcion).toLocaleDateString('es-ES')}
                   </span>
                 </div>

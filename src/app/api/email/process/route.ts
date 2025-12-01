@@ -1,3 +1,4 @@
+// src/app/api/email/process/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 // Importar los tipos de Enum de Prisma para tipado estricto
