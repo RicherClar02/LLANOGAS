@@ -8,34 +8,39 @@ const prisma = new PrismaClient();
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session || !session.user?.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id } = await params;
+    const { id } = params;
 
-    // Actualizar notificación en la base de datos
     const updatedNotification = await prisma.notification.update({
       where: { 
-        id: id,
-        userId: session.user.id // Solo el dueño puede marcar como leída
+        id,
+        userId: session.user.id 
       },
-      data: { 
-        read: true 
-      }
+      data: { read: true }
     });
 
     return NextResponse.json({ 
       success: true,
-      message: 'Notificación marcada como leída'
+      notification: updatedNotification
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error marcando notificación como leída:', error);
+    
+    if (error.code === 'P2025') {
+      return NextResponse.json(
+        { error: 'Notificación no encontrada' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

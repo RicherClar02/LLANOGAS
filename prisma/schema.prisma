@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:12345Syb.@localhost:5432/llanogas?schema=public"
+  url      = "postgresql://postgres:Richer02@localhost:5432/llanogas?schema=public"
 }
 
 model User {
@@ -109,15 +109,18 @@ model Email {
   procesado          Boolean    @default(false)
   clasificado        Boolean    @default(false)
   createdAt          DateTime   @default(now())
-  caso               Caso?
-
-  // NUEVOS CAMPOS PARA FILTRADO
+  
+  // NUEVOS CAMPOS PARA FILTRADO Y NOTIFICACIONES
   numeroRadicado     String?    // Extraído del asunto/cuerpo
   remitenteOriginal  String?    // Nombre del remitente
   dominioRemitente   String?    // Dominio para detectar entidad
   palabrasClave      String[]   // Para búsqueda
   esEntidadControl   Boolean    @default(false)
+  notificado         Boolean    @default(false) // ✅ NUEVO: Controlar si ya se notificó
   
+  // RELACIÓN CON CASO
+  caso               Caso?
+
   @@map("emails")
 }
 
@@ -184,7 +187,6 @@ model Aprobacion {
   @@map("aprobaciones")
 }
 
-
 model Notification {
   id          String   @id @default(uuid())
   type        String   // 'success', 'error', 'warning', 'info'
@@ -195,10 +197,15 @@ model Notification {
   casoId      String?
   timestamp   DateTime @default(now())
   
-  user        User     @relation(fields: [userId], references: [id])
-  caso        Caso?    @relation(fields: [casoId], references: [id])
+  // ✅ RELACIONES CORREGIDAS
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  caso        Caso?    @relation(fields: [casoId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+  @@index([userId])
+  @@index([read])
+  @@index([timestamp])
+  @@index([userId, read])
 }
 
 enum UserRole {

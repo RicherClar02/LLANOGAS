@@ -106,3 +106,52 @@ export async function crearNotificacionCasoCompletado(casoId: string) {
     console.error('Error creando notificación de caso completado:', error);
   }
 }
+
+// ✅ NUEVA FUNCIÓN PARA NOTIFICACIONES DE EMAILS
+export async function crearNotificacionNuevoEmail(email: any, usuarioId: string) {
+  try {
+    await prisma.notification.create({
+      data: {
+        type: 'info',
+        title: 'Nuevo correo recibido',
+        message: `De: ${email.from} - Asunto: ${email.subject}`,
+        userId: usuarioId,
+        read: false,
+        // Opcional: puedes agregar emailId o casoId si está relacionado
+      }
+    });
+  } catch (error) {
+    console.error('Error creando notificación de nuevo email:', error);
+  }
+}
+
+// ✅ FUNCIÓN PARA VERIFICAR EMAILS NUEVOS PERIÓDICAMENTE
+export async function verificarEmailsNuevos() {
+  try {
+    const emailsRecientes = await prisma.email.findMany({
+      where: {
+        procesado: false,
+        fecha: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Últimas 24 horas
+        }
+      },
+      include: {
+        caso: {
+          include: {
+            responsable: true,
+            creador: true
+          }
+        }
+      },
+      orderBy: {
+        fecha: 'desc'
+      },
+      take: 20
+    });
+
+    return emailsRecientes;
+  } catch (error) {
+    console.error('Error verificando emails nuevos:', error);
+    return [];
+  }
+}

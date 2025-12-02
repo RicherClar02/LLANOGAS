@@ -1,10 +1,9 @@
-
+// src/app/dashboard/notificaciones/page.tsx
 'use client';
 
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { Bell, Check, AlertTriangle, Info, CheckCircle, Filter, Search } from 'lucide-react';
+import { Bell, Check, AlertTriangle, Info, CheckCircle, Filter, Search, RefreshCw } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -15,97 +14,103 @@ interface Notification {
   read: boolean;
   casoId?: string;
   userId?: string;
+  source?: 'system' | 'email';
+  emailId?: string;
 }
 
 export default function NotificacionesPage() {
   const { data: session } = useSession();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<'todos' | 'no-leidos'>('todos');
   const [busqueda, setBusqueda] = useState('');
+  const [ultimaActualizacion, setUltimaActualizacion] = useState<Date>(new Date());
 
-  // Cargar notificaciones reales desde la API
-  useEffect(() => {
-    const cargarNotificaciones = async () => {
-      if (!session) return;
-      
-      try {
+  // Función para cargar notificaciones
+  const cargarNotificaciones = useCallback(async (showLoading = true) => {
+    if (!session) return;
+    
+    try {
+      if (showLoading && notifications.length === 0) {
         setLoading(true);
-        setError(null);
+      }
+      setRefreshing(true);
+      setError(null);
+      
+      // Agregar timestamp para evitar caché
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/notifications?t=${timestamp}`);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar notificaciones');
+      }
+      
+      const data = await response.json();
+      console.log('Notificaciones cargadas:', data.notifications);
+      
+      if (data.success && data.notifications) {
+        const notificacionesConFecha = data.notifications.map((notif: any) => ({
+          ...notif,
+          timestamp: new Date(notif.timestamp)
+        }));
         
-        const response = await fetch('/api/notifications');
+        setNotifications(notificacionesConFecha);
+        setUltimaActualizacion(new Date());
         
-        if (!response.ok) {
-          throw new Error('Error al cargar notificaciones');
+        if (data.metadata?.emailsNuevos > 0) {
+          console.log(`Hay ${data.metadata.emailsNuevos} emails nuevos`);
         }
-        
-        const data = await response.json();
-        console.log('Notificaciones cargadas:', data.notifications);
-        
-        if (data.success && data.notifications) {
-          // Convertir timestamp string a Date
-          const notificacionesConFecha = data.notifications.map((notif: any) => ({
-            ...notif,
-            timestamp: new Date(notif.timestamp)
-          }));
-          
-          setNotifications(notificacionesConFecha);
-        } else {
-          throw new Error('Estructura de respuesta inválida');
-        }
-      } catch (error) {
-        console.error('Error cargando notificaciones:', error);
-        setError('No se pudieron cargar las notificaciones');
-        
-        // Fallback a datos mock si la API falla
-        const mockNotifications: Notification[] = [
-          {
-            id: '1',
-            type: 'warning',
-            title: 'Caso por vencer',
-            message: 'El caso SUI-2024-001 vence en 2 días',
-            timestamp: new Date(Date.now() - 1000 * 60 * 30),
-            read: false,
-            casoId: 'SUI-2024-001'
-          },
-          {
-            id: '2',
-            type: 'info',
-            title: 'Nuevo comentario',
-            message: 'Tienes un nuevo comentario en el caso SS-2024-015',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-            read: false,
-            casoId: 'SS-2024-015'
-          },
-          {
-            id: '3',
-            type: 'success',
-            title: 'Caso completado',
-            message: 'El caso MME-2024-008 ha sido cerrado exitosamente',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-            read: true,
-            casoId: 'MME-2024-008'
-          },
-          {
-            id: '4',
-            type: 'error',
-            title: 'Plazo vencido',
-            message: 'El caso SUI-2024-005 ha vencido',
-            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
-            read: true,
-            casoId: 'SUI-2024-005'
-          }
-        ];
-        
-        setNotifications(mockNotifications);
-      } finally {
-        setLoading(false);
+      } else {
+        throw new Error('Estructura de respuesta inválida');
+      }
+    } catch (error) {
+      console.error('Error cargando notificaciones:', error);
+      setError('No se pudieron cargar las notificaciones');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [session, notifications.length]);
+
+  // Cargar notificaciones al montar el componente
+  useEffect(() => {
+    cargarNotificaciones();
+  }, [cargarNotificaciones]);
+
+  // Configurar polling automático (cada 30 segundos)
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        cargarNotificaciones(false);
+      }
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [cargarNotificaciones]);
+
+  // Escuchar eventos de notificación
+  useEffect(() => {
+    const handleNuevaNotificacion = () => {
+      cargarNotificaciones(false);
+    };
+
+    window.addEventListener('nueva-notificacion', handleNuevaNotificacion);
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        cargarNotificaciones(false);
       }
     };
 
-    cargarNotificaciones();
-  }, [session]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('nueva-notificacion', handleNuevaNotificacion);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [cargarNotificaciones]);
 
   const marcarComoLeida = async (id: string) => {
     try {
@@ -114,7 +119,6 @@ export default function NotificacionesPage() {
       });
 
       if (response.ok) {
-        // Actualizar estado local
         setNotifications(notifications.map(notif => 
           notif.id === id ? { ...notif, read: true } : notif
         ));
@@ -123,7 +127,7 @@ export default function NotificacionesPage() {
       }
     } catch (error) {
       console.error('Error marcando notificación como leída:', error);
-      // Fallback: actualizar estado local aunque falle la API
+      // Actualizar UI localmente aunque falle el API
       setNotifications(notifications.map(notif => 
         notif.id === id ? { ...notif, read: true } : notif
       ));
@@ -132,7 +136,6 @@ export default function NotificacionesPage() {
 
   const marcarTodasComoLeidas = async () => {
     try {
-      // Marcar cada notificación no leída
       const promesas = notifications
         .filter(notif => !notif.read)
         .map(notif => 
@@ -140,12 +143,13 @@ export default function NotificacionesPage() {
         );
 
       await Promise.all(promesas);
-      
-      // Actualizar estado local
       setNotifications(notifications.map(notif => ({ ...notif, read: true })));
+      
+      // Disparar evento para actualizar badge
+      window.dispatchEvent(new CustomEvent('notificaciones-leidas'));
     } catch (error) {
       console.error('Error marcando todas como leídas:', error);
-      // Fallback: actualizar estado local
+      // Actualizar UI localmente
       setNotifications(notifications.map(notif => ({ ...notif, read: true })));
     }
   };
@@ -194,7 +198,14 @@ export default function NotificacionesPage() {
 
   const noLeidasCount = notifications.filter(n => !n.read).length;
 
-  if (loading) {
+  // Función para navegar al caso
+  const irAlCaso = (casoId: string) => {
+    if (casoId) {
+      window.location.href = `/dashboard/bandeja/${casoId}`;
+    }
+  };
+
+  if (loading && notifications.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -214,9 +225,21 @@ export default function NotificacionesPage() {
           <p className="text-gray-600">
             {noLeidasCount} {noLeidasCount === 1 ? 'no leída' : 'no leídas'} de {notifications.length} total
           </p>
+          <p className="text-sm text-gray-500">
+            Última actualización: {ultimaActualizacion.toLocaleTimeString('es-ES')}
+          </p>
         </div>
 
         <div className="flex space-x-3">
+          <button
+            onClick={() => cargarNotificaciones(false)}
+            disabled={refreshing}
+            className="flex items-center px-4 py-2 text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+          >
+            <RefreshCw className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} size={18} />
+            {refreshing ? 'Actualizando...' : 'Actualizar'}
+          </button>
+          
           {noLeidasCount > 0 && (
             <button
               onClick={marcarTodasComoLeidas}
@@ -285,8 +308,9 @@ export default function NotificacionesPage() {
               <div
                 key={notification.id}
                 className={`p-6 border-l-4 ${getTypeColor(notification.type)} ${
-                  !notification.read ? 'bg-blue-50' : 'hover:bg-gray-50'
-                } transition-colors`}
+                  !notification.read ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
+                } transition-colors cursor-pointer`}
+                onClick={() => notification.casoId && irAlCaso(notification.casoId)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex space-x-4 flex-1">
@@ -302,7 +326,10 @@ export default function NotificacionesPage() {
                         
                         {!notification.read && (
                           <button
-                            onClick={() => marcarComoLeida(notification.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              marcarComoLeida(notification.id);
+                            }}
                             className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
                           >
                             <Check size={16} />
@@ -315,7 +342,7 @@ export default function NotificacionesPage() {
                         {notification.message}
                       </p>
                       
-                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                      <div className="flex items-center flex-wrap gap-2 text-sm text-gray-500">
                         <span>
                           {notification.timestamp.toLocaleDateString('es-ES', {
                             year: 'numeric',
@@ -329,6 +356,12 @@ export default function NotificacionesPage() {
                         {notification.casoId && (
                           <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
                             Caso: {notification.casoId}
+                          </span>
+                        )}
+                        
+                        {notification.source === 'email' && (
+                          <span className="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs">
+                            📧 Correo
                           </span>
                         )}
                         
