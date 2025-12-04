@@ -2,9 +2,13 @@ LLANOGAS
 
 🔨 Herramientas y Tecnologías
 El proyecto fue construido utilizando las siguientes herramientas y tecnologías:
+
 -Lenguajes/Tipos: TypeScript (98.3%), JavaScript
+
 -Frontend/Librerías: React, date-fns
+
 -Backend/Base de Datos: Prisma
+
 -Herramientas de Desarrollo: JSON, Markdown, npm, .ENV, ESLint
 
 📝 Descripción general
@@ -33,15 +37,19 @@ Este proyecto requiere las siguientes dependencias:
 
 Instalación
 Construya LLANOGAS desde la fuente e instale dependencias:
-1.Clonar el repositorio: git clone https://github.com/RicherClar02/LLANOGAS
+1.Clonar el repositorio: 
+git clone https://github.com/RicherClar02/LLANOGAS
 
-2.Navegue hasta el directorio del proyecto: cd LLANOGAS
+2.Navegue hasta el directorio del proyecto: 
+cd LLANOGAS
 
-3.Instalar las dependencias: Usando npm: npm install
+3.Instalar las dependencias: Usando npm: 
+npm install
 
 Uso
 Ejecute el proyecto con:
-Usando npm: npm run dev
+Usando npm: 
+npm run dev
 
 Testing
 LLANOGAS utiliza el framework Jest (o el marco de prueba que uses) como marco de prueba. Ejecute el conjunto de pruebas con: npm test
