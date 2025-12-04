@@ -1,3 +1,4 @@
+// src/lib/auth.ts
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { PrismaClient, UserRole } from '@prisma/client'; // <-- Importar UserRole
 import NextAuth, { NextAuthOptions } from 'next-auth';
