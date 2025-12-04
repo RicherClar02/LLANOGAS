@@ -53,16 +53,4 @@ npm run dev
 
 Testing
 LLANOGAS utiliza el framework Jest (o el marco de prueba que uses) como marco de prueba. Ejecute el conjunto de pruebas con: npm test
-
-
-
-
-
-
-
-
-
-
-Construya LLANOGAS desde la fuente e instale dependencias:
-
-Clonar el repositorio:
+Usando npm: npm test
