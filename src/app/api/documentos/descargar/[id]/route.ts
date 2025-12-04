@@ -1,4 +1,4 @@
-// src\app\api\documentos\descargar\[id]\route.ts
+// src/app/api/documentos/descargar/[id]/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -6,10 +6,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import * as fs from 'fs'; 
 import * as path from 'path'; 
-import { ReadableStream } from 'stream/web'; // Importación para ReadableStream (puede ser implícito en Node 18+)
+
 
 const prisma = new PrismaClient();
 
+// Definición de la interfaz para tipado de parámetros de ruta (para resolver ts(2552))
 interface RouteParams {
     params: {
         id: string; 
@@ -21,13 +22,13 @@ export async function GET(
     { params }: RouteParams
 ) {
     
-    // 🚀 SOLUCIÓN AL ERROR NEXT.JS: Obtener el ID del pathname
+    // Solución al error 'sync-dynamic-apis'
+    await new Promise(resolve => resolve(null)); 
+    
+    // Obtener el ID del pathname (solución robusta)
     const pathname = request.nextUrl.pathname;
     const pathnameParts = pathname.split('/');
     const documentoId = pathnameParts[pathnameParts.length - 1]; 
-    
-    // Mantenemos esto si el error de Next.js es muy persistente
-    await new Promise(resolve => resolve(null)); 
 
     let documento: any;
     let fileBuffer: Buffer;
@@ -39,7 +40,7 @@ export async function GET(
             return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
         }
 
-        // 1. Obtener el Documento de Prisma
+        // Obtener el Documento
         documento = await prisma.documento.findUnique({
             where: { id: documentoId } 
         });
@@ -48,39 +49,41 @@ export async function GET(
             return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
         }
 
-        // 2. Usar el campo 'url' (que contiene la ruta en tu esquema)
-        const rutaRelativa = documento.url as string; // Aseguramos el tipo
+        // Usar el campo 'url' (ruta relativa: /uploads/archivo.pdf)
+        const rutaRelativa = documento.url as string; 
         
         if (!rutaRelativa) {
              console.error(`Documento ${documentoId} no tiene URL/ruta de almacenamiento.`);
              return NextResponse.json({ error: 'Ruta de archivo no definida.' }, { status: 500 });
         }
         
-        // --- 3. CONSTRUCCIÓN DE LA RUTA Y LECTURA ---
+        // --- LECTURA DEL ARCHIVO ---
         
-        // ADVERTENCIA CRÍTICA: La ruta construida debe coincidir con la que falló (ENOENT).
-        // Si el archivo estaba en: C:\Users\santi\Videos\llanogas\LLANOGAS\documentos_storage\uploads\1764623654984-Informe.pdf
-        // Y process.cwd() es: C:\Users\santi\Videos\llanogas\LLANOGAS
-        // Entonces solo necesitas unir el resto de la ruta relativa.
-        
-        const fullPath = path.join(process.cwd(), rutaRelativa); 
+        const pathSegments = rutaRelativa.startsWith('/') ? rutaRelativa.substring(1) : rutaRelativa;
 
+        // Construcción de la ruta: {proyecto}/uploads/archivo.pdf
+        const fullPath = path.join(process.cwd(), pathSegments); 
+        
         try {
-            // Intenta leer el archivo
+            // Leer el archivo en un Buffer
             fileBuffer = fs.readFileSync(fullPath);
         } catch (e: any) {
-            // Este catch maneja el error ENOENT
+            // Maneja el error ENOENT (Archivo no encontrado)
             console.error(`Error de lectura de archivo (${e.code}): ${fullPath}`, e);
             
             if (e.code === 'ENOENT') {
-                return NextResponse.json({ error: 'Archivo físico no encontrado en el servidor (Ruta: ' + rutaRelativa + ').' }, { status: 404 });
+                return NextResponse.json(
+                    { error: `Error al descargar el documento. Archivo no encontrado en la ruta esperada.` }, 
+                    { status: 404 }
+                );
             }
             
             throw e;
         }
 
-        // --- 4. PREPARACIÓN Y ENVÍO DE RESPUESTA (Usando ReadableStream) ---
+        // --- PREPARACIÓN Y ENVÍO DE RESPUESTA (Solución al error del fileBuffer) ---
         
+        // Convertir el Buffer a ReadableStream para ser un BodyInit válido para NextResponse
         const stream = new ReadableStream({
             start(controller) {
                 controller.enqueue(fileBuffer);
@@ -88,7 +91,6 @@ export async function GET(
             },
         });
 
-        // Usamos las propiedades del documento y el tamaño real del buffer
         const fileMimeType = documento.mimeType || 'application/octet-stream'; 
         const fileSize = fileBuffer.length.toString(); 
         
@@ -102,7 +104,6 @@ export async function GET(
         });
 
     } catch (error) {
-        // Este catch maneja errores inesperados
         console.error('Error interno inesperado en descarga:', error);
         return NextResponse.json(
             { error: 'Error interno del servidor' },

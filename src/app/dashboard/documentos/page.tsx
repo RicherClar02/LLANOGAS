@@ -203,27 +203,24 @@ export default function DocumentosPage() {
         setDocumentos(prev => prev.filter(d => d.id !== documento.id));
         alert('Documento eliminado exitosamente');
       } else {
-        // --- INICIO DE LA MEJORA ---
         
         // 1. Intentar leer el cuerpo del error como JSON
         let errorMessage = 'Error desconocido al eliminar el documento.';
         let errorData;
         
         try {
-            // Asumimos que el backend devuelve { error: 'Mensaje' }
+      
             errorData = await response.json(); 
             errorMessage = errorData.error || `Error ${response.status}: ${errorMessage}`;
         } catch (e) {
-            // Si no es JSON, usamos el estado de la respuesta
             errorMessage = `Error ${response.status}. Por favor, revisa los logs del servidor.`; 
         }
 
         console.error('Error al eliminar documento:', response.status, errorData || errorMessage);
         alert(`❌ Falló la eliminación: ${errorMessage}`);
-        // --- FIN DE LA MEJORA ---
       }
     } catch (error) {
-      // Este bloque maneja errores de red, no errores de API 4xx/5xx
+     
       console.error('Error de conexión/red:', error);
       alert('Error de conexión con el servidor. Intente de nuevo.');
     }
@@ -523,7 +520,7 @@ export default function DocumentosPage() {
                         )}
                       </div>
 
-                      {/* Etiquetas */}
+                    
                       <div className="flex flex-wrap gap-2">
                         {documento.etiquetas.map((etiqueta, index) => (
                           <span
@@ -545,13 +542,6 @@ export default function DocumentosPage() {
                       title="Descargar"
                     >
                       <Download size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleVistaPrevia(documento)}
-                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                      title="Vista previa"
-                    >
-                      <Eye size={16} />
                     </button>
                     <button
                       onClick={() => handleEliminar(documento)}
