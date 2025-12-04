@@ -7,7 +7,7 @@ El proyecto fue construido utilizando las siguientes herramientas y tecnologías
 
 -Frontend/Librerías: React, date-fns
 
--Backend/Base de Datos: Prisma
+-Backend/Base de Datos: Prisma-PostgreSQL
 
 -Herramientas de Desarrollo: JSON, Markdown, npm, .ENV, ESLint
 
