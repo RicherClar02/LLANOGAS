@@ -1,10 +1,10 @@
-// src/app/api/documentos/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import * as fs from 'fs'; 
+import * as fs from 'fs';
 import * as path from 'path';
+import { tmpdir } from 'os';
 
 const prisma = new PrismaClient();
 
@@ -103,131 +103,149 @@ export async function GET(request: NextRequest) {
   }
 }
 
-
 export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user?.email) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session || !session.user?.email) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
 
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const tipo = formData.get('tipo') as string;
-    const casoId = formData.get('casoId') as string;
-    const esPlantilla = formData.get('esPlantilla') === 'true';
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const tipo = formData.get('tipo') as string;
+    const casoId = formData.get('casoId') as string;
+    const esPlantilla = formData.get('esPlantilla') === 'true';
 
-    if (!file) {
-      return NextResponse.json({ error: 'Archivo requerido' }, { status: 400 });
-    }
+    if (!file) {
+      return NextResponse.json({ error: 'Archivo requerido' }, { status: 400 });
+    }
 
-    // Obtener usuario
-    const usuario = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
+    // Obtener usuario
+    const usuario = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
 
-    if (!usuario) {
-      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
-    }
+    if (!usuario) {
+      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
+    }
 
-    // 💾 LÓGICA DE ALMACENAMIENTO FÍSICO (¡BLOQUE FALTANTE AGREGADO!)
+    // 💾 LÓGICA DE ALMACENAMIENTO FÍSICO - CORREGIDA PARA RAILWAY
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const filename = `${Date.now()}-${file.name}`;
-    const relativeUrl = `/uploads/${filename}`;
+    const filename = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
     
-    // Ruta absoluta: {proyecto}/uploads
-    const uploadDir = path.join(process.cwd(), 'uploads');
+    // 🚀 CORRECCIÓN PARA RAILWAY: Diferentes rutas según ambiente
+    let uploadDir: string;
+    let relativeUrl: string;
+    
+    if (process.env.NODE_ENV === 'production') {
+      // En Railway: usar /tmp/uploads (tiene permisos de escritura)
+      uploadDir = path.join(tmpdir(), 'uploads');
+      // Usar endpoint de API para servir archivos
+      relativeUrl = `/api/uploads/${filename}`;
+    } else {
+      // En desarrollo local: usar carpeta en proyecto
+      uploadDir = path.join(process.cwd(), 'uploads');
+      relativeUrl = `/uploads/${filename}`;
+    }
+    
     const filePath = path.join(uploadDir, filename);
 
     try {
-        // Crear el directorio 'uploads' si no existe
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        
-        // Escribir el archivo en el disco
-        fs.writeFileSync(filePath, buffer);
+      // Crear el directorio si no existe
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
+      // Escribir el archivo en el disco
+      fs.writeFileSync(filePath, buffer);
+      console.log(`✅ Archivo guardado en: ${filePath}`);
 
-    } catch (fsError) {
-        console.error('Error al guardar archivo en disco:', fsError);
-        // Devuelve 500 si falla la escritura en disco
-        return NextResponse.json(
-            { error: 'Error al guardar el archivo en el servidor. Revise permisos.' }, 
-            { status: 500 }
-        );
+    } catch (fsError: any) {
+      console.error('Error al guardar archivo en disco:', fsError);
+      console.error('Directorio intentado:', uploadDir);
+      console.error('Permisos del directorio:', fs.existsSync(uploadDir) ? 'Existe' : 'No existe');
+      
+      return NextResponse.json(
+        { 
+          error: 'Error al guardar el archivo en el servidor. Revise permisos.',
+          detalle: process.env.NODE_ENV === 'production' ? 
+            'Railway: usando /tmp/uploads' : 
+            'Desarrollo: usando ./uploads'
+        }, 
+        { status: 500 }
+      );
     }
-    // -------------------------------------------------------------
 
-    // Crear documento en la base de datos
-    const documento = await prisma.documento.create({
-      data: {
-        nombre: file.name,
-        tipo: tipo || 'anexo',
-        url: relativeUrl, // Usamos la URL generada a partir de la ruta guardada
-        mimeType: file.type, // Es útil guardar el tipo MIME
-        tamano: file.size,
-        esPlantilla: esPlantilla,
-        usuario: {
-          connect: { id: usuario.id }
-        },
-        ...(casoId && {
-          caso: {
-            connect: { id: casoId }
-          }
-        })
-      },
-      include: {
-        usuario: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
-        caso: {
-          select: {
-            numeroRadicadoEntrada: true,
-            entidad: {
-              select: {
-                sigla: true
-              }
-            }
-          }
-        }
-      }
-    });
+    // Crear documento en la base de datos
+    const documento = await prisma.documento.create({
+      data: {
+        nombre: file.name,
+        tipo: tipo || 'anexo',
+        url: relativeUrl, // URL que apunta al endpoint de descarga
+        mimeType: file.type,
+        tamano: file.size,
+        esPlantilla: esPlantilla,
+        usuario: {
+          connect: { id: usuario.id }
+        },
+        ...(casoId && {
+          caso: {
+            connect: { id: casoId }
+          }
+        })
+      },
+      include: {
+        usuario: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        caso: {
+          select: {
+            numeroRadicadoEntrada: true,
+            entidad: {
+              select: {
+                sigla: true
+              }
+            }
+          }
+        }
+      }
+    });
 
-    return NextResponse.json({
-      success: true,
-      documento: {
-        id: documento.id,
-        nombre: documento.nombre,
-        tipo: documento.tipo,
-        formato: documento.url.split('.').pop() || 'pdf',
-        tamaño: documento.tamano ? `${(documento.tamano / (1024 * 1024)).toFixed(1)} MB` : '0 MB',
-        fechaCreacion: documento.createdAt.toISOString().split('T')[0],
-        fechaModificacion: documento.updatedAt.toISOString().split('T')[0],
-        creadoPor: {
-          name: documento.usuario.name || 'Usuario',
-          email: documento.usuario.email
-        },
-        casoId: documento.caso?.numeroRadicadoEntrada,
-        entidad: documento.caso?.entidad?.sigla,
-        etiquetas: [documento.tipo, documento.esPlantilla ? 'plantilla' : 'documento'],
-        url: documento.url,
-        esPlantilla: documento.esPlantilla
-      }
-    });
+    return NextResponse.json({
+      success: true,
+      documento: {
+        id: documento.id,
+        nombre: documento.nombre,
+        tipo: documento.tipo,
+        formato: documento.url.split('.').pop() || 'pdf',
+        tamaño: documento.tamano ? `${(documento.tamano / (1024 * 1024)).toFixed(1)} MB` : '0 MB',
+        fechaCreacion: documento.createdAt.toISOString().split('T')[0],
+        fechaModificacion: documento.updatedAt.toISOString().split('T')[0],
+        creadoPor: {
+          name: documento.usuario.name || 'Usuario',
+          email: documento.usuario.email
+        },
+        casoId: documento.caso?.numeroRadicadoEntrada,
+        entidad: documento.caso?.entidad?.sigla,
+        etiquetas: [documento.tipo, documento.esPlantilla ? 'plantilla' : 'documento'],
+        url: documento.url,
+        esPlantilla: documento.esPlantilla
+      }
+    });
 
-  } catch (error) {
-    console.error('Error subiendo documento:', error);
-    return NextResponse.json(
-      { error: 'Error interno del servidor' },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
-  }
+  } catch (error: any) {
+    console.error('Error subiendo documento:', error);
+    return NextResponse.json(
+      { error: 'Error interno del servidor', detalle: error.message },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
 }

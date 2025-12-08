@@ -1,115 +1,130 @@
-// src/app/api/documentos/descargar/[id]/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import * as fs from 'fs'; 
-import * as path from 'path'; 
-
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { readFile } from 'fs/promises';
+import { existsSync } from 'fs';
 
 const prisma = new PrismaClient();
 
-// Definición de la interfaz para tipado de parámetros de ruta (para resolver ts(2552))
+// Interfaz para parámetros de ruta
 interface RouteParams {
-    params: {
-        id: string; 
-    };
+  params: {
+    id: string;
+  };
 }
 
 export async function GET(
-    request: NextRequest,
-    { params }: RouteParams
+  request: NextRequest,
+  { params }: RouteParams
 ) {
+  
+  // Solución al error 'sync-dynamic-apis'
+  await new Promise(resolve => setTimeout(resolve, 0));
+  
+  try {
+    const session = await getServerSession(authOptions); 
     
-    // Solución al error 'sync-dynamic-apis'
-    await new Promise(resolve => resolve(null)); 
-    
-    // Obtener el ID del pathname (solución robusta)
-    const pathname = request.nextUrl.pathname;
-    const pathnameParts = pathname.split('/');
-    const documentoId = pathnameParts[pathnameParts.length - 1]; 
-
-    let documento: any;
-    let fileBuffer: Buffer;
-
-    try {
-        const session = await getServerSession(authOptions); 
-        
-        if (!session) {
-            return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-        }
-
-        // Obtener el Documento
-        documento = await prisma.documento.findUnique({
-            where: { id: documentoId } 
-        });
-
-        if (!documento) {
-            return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
-        }
-
-        // Usar el campo 'url' (ruta relativa: /uploads/archivo.pdf)
-        const rutaRelativa = documento.url as string; 
-        
-        if (!rutaRelativa) {
-             console.error(`Documento ${documentoId} no tiene URL/ruta de almacenamiento.`);
-             return NextResponse.json({ error: 'Ruta de archivo no definida.' }, { status: 500 });
-        }
-        
-        // --- LECTURA DEL ARCHIVO ---
-        
-        const pathSegments = rutaRelativa.startsWith('/') ? rutaRelativa.substring(1) : rutaRelativa;
-
-        // Construcción de la ruta: {proyecto}/uploads/archivo.pdf
-        const fullPath = path.join(process.cwd(), pathSegments); 
-        
-        try {
-            // Leer el archivo en un Buffer
-            fileBuffer = fs.readFileSync(fullPath);
-        } catch (e: any) {
-            // Maneja el error ENOENT (Archivo no encontrado)
-            console.error(`Error de lectura de archivo (${e.code}): ${fullPath}`, e);
-            
-            if (e.code === 'ENOENT') {
-                return NextResponse.json(
-                    { error: `Error al descargar el documento. Archivo no encontrado en la ruta esperada.` }, 
-                    { status: 404 }
-                );
-            }
-            
-            throw e;
-        }
-
-        // --- PREPARACIÓN Y ENVÍO DE RESPUESTA (Solución al error del fileBuffer) ---
-        
-        // Convertir el Buffer a ReadableStream para ser un BodyInit válido para NextResponse
-        const stream = new ReadableStream({
-            start(controller) {
-                controller.enqueue(fileBuffer);
-                controller.close();
-            },
-        });
-
-        const fileMimeType = documento.mimeType || 'application/octet-stream'; 
-        const fileSize = fileBuffer.length.toString(); 
-        
-        return new NextResponse(stream, { 
-            status: 200,
-            headers: {
-                'Content-Type': fileMimeType,
-                'Content-Disposition': `attachment; filename="${documento.nombre}"`,
-                'Content-Length': fileSize,
-            },
-        });
-
-    } catch (error) {
-        console.error('Error interno inesperado en descarga:', error);
-        return NextResponse.json(
-            { error: 'Error interno del servidor' },
-            { status: 500 }
-        );
-    } finally {
-        await prisma.$disconnect();
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
+
+    const { id } = params;
+    
+    if (!id) {
+      return NextResponse.json({ error: 'ID de documento requerido' }, { status: 400 });
+    }
+
+    // Obtener el Documento
+    const documento = await prisma.documento.findUnique({
+      where: { id }
+    });
+
+    if (!documento) {
+      return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
+    }
+
+    // Extraer nombre de archivo de la URL
+    const url = documento.url as string;
+    
+    // 🚀 CORRECCIÓN: Manejar diferentes formatos de URL
+    let filename: string;
+    
+    if (url.includes('/api/uploads/')) {
+      // URL nueva: /api/uploads/filename.ext
+      filename = url.split('/').pop() || '';
+    } else if (url.includes('/uploads/')) {
+      // URL antigua: /uploads/filename.ext
+      filename = url.split('/').pop() || '';
+    } else {
+      // URL directa
+      filename = url;
+    }
+    
+    if (!filename) {
+      console.error(`Documento ${id} no tiene URL/ruta válida: ${url}`);
+      return NextResponse.json({ error: 'Ruta de archivo no definida.' }, { status: 500 });
+    }
+    
+    // --- LECTURA DEL ARCHIVO ---
+    // 🚀 CORRECCIÓN: Diferentes rutas según ambiente
+    let filePath: string;
+    
+    if (process.env.NODE_ENV === 'production') {
+      // Railway: buscar en /tmp/uploads
+      filePath = join(tmpdir(), 'uploads', filename);
+    } else {
+      // Desarrollo local: buscar en ./uploads
+      filePath = join(process.cwd(), 'uploads', filename);
+    }
+    
+    // Verificar que el archivo existe
+    if (!existsSync(filePath)) {
+      console.error(`Archivo no encontrado en: ${filePath}`);
+      console.error(`Buscando archivo: ${filename}`);
+      console.error(`URL del documento: ${url}`);
+      
+      return NextResponse.json(
+        { 
+          error: 'Error al descargar el documento. Archivo no encontrado.',
+          detalle: `Ruta: ${filePath}`
+        }, 
+        { status: 404 }
+      );
+    }
+
+    // Leer el archivo
+    const fileBuffer = await readFile(filePath);
+    
+    // Convertir Buffer a ReadableStream
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(fileBuffer);
+        controller.close();
+      },
+    });
+
+    const fileMimeType = documento.mimeType || 'application/octet-stream';
+    
+    return new NextResponse(stream, { 
+      status: 200,
+      headers: {
+        'Content-Type': fileMimeType,
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(documento.nombre)}"`,
+        'Content-Length': fileBuffer.length.toString(),
+        'Cache-Control': 'no-cache',
+      },
+    });
+
+  } catch (error: any) {
+    console.error('Error interno en descarga:', error);
+    return NextResponse.json(
+      { error: 'Error interno del servidor', detalle: error.message },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
 }
